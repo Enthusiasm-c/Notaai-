@@ -12,3 +12,5 @@ data/learned/
 # OS
 .DS_Store
 .venv/
+.venv/
+.venv/
