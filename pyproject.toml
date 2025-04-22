@@ -1,0 +1,12 @@
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = E203,E501,W503
+# E203 конфликтует с Black, E501 (длина) ослаблен до 100y
+
