@@ -18,21 +18,21 @@ _products_cache = []
 def load_products():
     """
     Загружает базу товаров из CSV-файла
-    
+
     Returns:
         list: Список товаров
     """
     global _products_cache
-    
+
     # Если кэш не пуст, используем его
     if _products_cache:
         return _products_cache
-    
+
     # Проверяем наличие файла
     if not os.path.exists(PRODUCTS_FILE):
         logger.warning(f"Products file not found: {PRODUCTS_FILE}")
         return []
-    
+
     try:
         products = []
         with open(PRODUCTS_FILE, 'r', encoding='utf-8') as f:
@@ -43,7 +43,7 @@ def load_products():
                     'name': row.get('name', ''),
                     'category': row.get('category', '')
                 })
-        
+
         # Сохраняем в кэш
         _products_cache = products
         logger.info(f"Loaded {len(products)} products from {PRODUCTS_FILE}")
@@ -55,48 +55,48 @@ def load_products():
 def match(item_name: str, threshold: float = 0.6) -> Tuple[Optional[str], float]:
     """
     Сопоставляет название товара с базой данных
-    
+
     Args:
         item_name: Название товара
         threshold: Порог схожести (от 0 до 1)
-        
+
     Returns:
         tuple: (ID товара, оценка схожести) или (None, 0) если не найдено
     """
     # Загружаем базу товаров
     products = load_products()
-    
+
     if not products:
         logger.warning("No products available for matching")
         return None, 0
-    
+
     best_match = None
     best_score = 0
-    
+
     # Нормализуем название товара
     item_name_lower = item_name.lower().strip()
-    
+
     # Ищем точное совпадение
     for product in products:
         product_name = product.get('name', '').lower().strip()
-        
+
         if product_name == item_name_lower:
             # Нашли точное совпадение
             logger.info(f"Exact match for '{item_name}': {product.get('name')}")
             return product.get('id'), 1.0
-    
+
     # Если точное совпадение не найдено, используем нечеткое сопоставление
     for product in products:
         product_name = product.get('name', '').lower().strip()
-        
+
         # Используем алгоритм SequenceMatcher для нечеткого сопоставления
         score = difflib.SequenceMatcher(None, item_name_lower, product_name).ratio()
-        
+
         # Обновляем лучшее совпадение, если текущее лучше
         if score > best_score:
             best_match = product
             best_score = score
-    
+
     # Проверяем, превышает ли лучшее совпадение порог
     if best_score >= threshold and best_match:
         logger.info(f"Best match for '{item_name}': {best_match.get('name')} (score: {best_score:.2f})")
@@ -108,55 +108,55 @@ def match(item_name: str, threshold: float = 0.6) -> Tuple[Optional[str], float]
 def get_product_by_id(product_id: str) -> Optional[dict]:
     """
     Возвращает информацию о товаре по его ID
-    
+
     Args:
         product_id: ID товара
-        
+
     Returns:
         dict: Информация о товаре или None, если товар не найден
     """
     # Загружаем базу товаров
     products = load_products()
-    
+
     # Ищем товар по ID
     for product in products:
         if product.get('id') == product_id:
             return product
-    
+
     return None
 
 def save_product(product_id: str, product_name: str, category: str = ''):
     """
     Сохраняет новый товар в базу данных
-    
+
     Args:
         product_id: ID товара
         product_name: Название товара
         category: Категория товара
-        
+
     Returns:
         bool: Успешно ли сохранен товар
     """
     global _products_cache
-    
+
     try:
         # Проверяем наличие файла
         file_exists = os.path.exists(PRODUCTS_FILE)
-        
+
         # Создаем директорию, если ее нет
         os.makedirs(os.path.dirname(PRODUCTS_FILE), exist_ok=True)
-        
+
         # Добавляем товар в файл
         with open(PRODUCTS_FILE, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            
+
             # Записываем заголовки, если файл новый
             if not file_exists:
                 writer.writerow(['id', 'name', 'category'])
-            
+
             # Записываем товар
             writer.writerow([product_id, product_name, category])
-        
+
         # Добавляем товар в кэш
         if _products_cache is not None:
             _products_cache.append({
@@ -164,7 +164,7 @@ def save_product(product_id: str, product_name: str, category: str = ''):
                 'name': product_name,
                 'category': category
             })
-        
+
         logger.info(f"Saved new product: {product_name} (ID: {product_id})")
         return True
     except Exception as e:
