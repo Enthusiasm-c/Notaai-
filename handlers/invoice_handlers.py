@@ -56,7 +56,7 @@ async def process_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
         # Применяем сопоставления и конвертации
         matched_data = await match_invoice_items(invoice_data)
-        logger.info(f"Item matching completed")
+        logger.info("Item matching completed")
 
         conversions_applied = apply_unit_conversions(matched_data)
         logger.info(f"Unit conversions applied: {len(conversions_applied)} conversions")

@@ -156,7 +156,7 @@ async def handle_item_selection(update: Update, context: ContextTypes.DEFAULT_TY
 
         try:
             await query.edit_message_text(
-                text=f"❌ An error occurred. Please try again or start over with /cancel."
+                text="❌ An error occurred. Please try again or start over with /cancel."
             )
         except Exception:
             pass
@@ -208,7 +208,7 @@ async def display_item_edit_options(query, user_id, item_index):
     if product_id:
         message_text += f"Status: ✅ Matched with ID: {product_id}\n"
     else:
-        message_text += f"Status: ❓ Unrecognized\n"
+        message_text += "Status: ❓ Unrecognized\n"
 
     message_text += "\nSelect action:"
 
@@ -497,7 +497,7 @@ async def handle_item_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
         try:
             await query.edit_message_text(
-                text=f"❌ An error occurred. Please try again or start over with /cancel."
+                text="❌ An error occurred. Please try again or start over with /cancel."
             )
         except Exception as inner_e:
             log_error(f"Error sending error message: {inner_e}", exc_info=True)
@@ -572,7 +572,7 @@ async def handle_manual_item_entry(update: Update, context: ContextTypes.DEFAULT
 
             await update.message.reply_text(
                 f"❓ Product '{entered_name}' not found in database.\n\n"
-                f"Would you like to add it as a new product?",
+                "Would you like to add it as a new product?",
                 reply_markup=InlineKeyboardMarkup(keyboard),
             )
 
@@ -655,7 +655,7 @@ async def handle_manual_item_entry(update: Update, context: ContextTypes.DEFAULT
                 f"Name: {name}\n"
                 f"Quantity: {qty} {unit}\n"
                 f"Price: {price} IDR\n\n"
-                f"Select action:"
+                "Select action:"
             )
 
             await update.message.reply_text(
@@ -685,7 +685,7 @@ async def handle_manual_item_entry(update: Update, context: ContextTypes.DEFAULT
         error_msg = f"Error in handle_manual_item_entry: {e}"
         log_error(error_msg, exc_info=True)
         await update.message.reply_text(
-            f"❌ An error occurred. Please try again or start over with /cancel."
+            "❌ An error occurred. Please try again or start over with /cancel."
         )
         return WAIT_PHOTO
 
@@ -827,7 +827,7 @@ async def handle_manual_entry_callback(update: Update, context: ContextTypes.DEF
 
         try:
             await query.edit_message_text(
-                text=f"❌ An error occurred. Please try again or start over with /cancel."
+                text="❌ An error occurred. Please try again or start over with /cancel."
             )
         except Exception:
             pass
@@ -937,7 +937,7 @@ async def handle_conversion_entry(update: Update, context: ContextTypes.DEFAULT_
 
                 # Отображаем успешное завершение
                 await update.message.reply_text(
-                    f"✅ Unit conversion set successfully!\n\n"
+                    "✅ Unit conversion set successfully!\n\n"
                     f"1 {source_unit} = {conversion_factor} {target_unit}\n\n"
                     f"This conversion will be automatically applied to all '{product_name}' items in future invoices."
                 )
@@ -996,7 +996,7 @@ async def handle_conversion_entry(update: Update, context: ContextTypes.DEFAULT_
         error_msg = f"Error in handle_conversion_entry: {e}"
         log_error(error_msg, exc_info=True)
         await update.message.reply_text(
-            f"❌ An error occurred. Please try again or start over with /cancel."
+            "❌ An error occurred. Please try again or start over with /cancel."
         )
         return WAIT_PHOTO
 
@@ -1050,7 +1050,7 @@ async def handle_conversion_callback(update: Update, context: ContextTypes.DEFAU
 
         try:
             await query.edit_message_text(
-                text=f"❌ An error occurred. Please try again or start over with /cancel."
+                text="❌ An error occurred. Please try again or start over with /cancel."
             )
         except Exception:
             pass

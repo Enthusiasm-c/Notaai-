@@ -4,9 +4,7 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from services.syrve_service import SyrveService
 from utils.invoice_processing import format_invoice_for_display
-from utils.match import get_product_by_id
 
 # Set up logging
 logger = logging.getLogger(__name__)

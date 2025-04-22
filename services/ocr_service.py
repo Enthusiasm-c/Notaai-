@@ -1,6 +1,6 @@
 import base64
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from openai import OpenAI
 from openai.types.chat import ChatCompletion

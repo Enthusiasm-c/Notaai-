@@ -1,7 +1,7 @@
 import datetime
 import logging
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from utils.learning import get_product_id_from_mapping
 from utils.match import get_product_by_id, match

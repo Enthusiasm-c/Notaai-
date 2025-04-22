@@ -1,7 +1,6 @@
 import datetime
-import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import requests
 

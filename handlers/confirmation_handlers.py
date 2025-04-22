@@ -1,4 +1,3 @@
-import asyncio
 import logging
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -56,13 +55,13 @@ async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE
                 filename = save_invoice_data(user_id, user_data[user_id]["matched_data"])
 
                 # Получаем токен для доступа к Syrve API
-                logger.info(f"Authenticating with Syrve API")
+                logger.info("Authenticating with Syrve API")
                 token = await authenticate()
 
                 if not token:
                     log_error("Failed to authenticate with Syrve API")
                     await query.edit_message_text(
-                        text=f"❌ Data saved, but could not authenticate with Syrve API. Check error logs for details."
+                        text="❌ Data saved, but could not authenticate with Syrve API. Check error logs for details."
                     )
                     return WAIT_PHOTO
 
@@ -70,7 +69,7 @@ async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE
                 invoice_data = prepare_invoice_data_for_syrve(user_data[user_id]["matched_data"])
 
                 # Отправляем данные в Syrve
-                logger.info(f"Sending invoice data to Syrve")
+                logger.info("Sending invoice data to Syrve")
                 document_id = await send_invoice_to_syrve(token, invoice_data)
 
                 if document_id:
@@ -88,13 +87,13 @@ async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE
                         log_error(f"Failed to commit document {document_id}")
                         await query.edit_message_text(
                             text=f"⚠️ Invoice sent to Syrve (ID: {document_id}), but could not be committed. "
-                            f"Please commit it manually in Syrve."
+                            "Please commit it manually in Syrve."
                         )
                 else:
-                    log_error(f"Failed to send invoice to Syrve")
+                    log_error("Failed to send invoice to Syrve")
                     await query.edit_message_text(
                         text=f"❌ Data saved to {filename}, but an error occurred when sending to Syrve. "
-                        f"Check error logs for details."
+                        "Check error logs for details."
                     )
 
                 # Очищаем данные пользователя
@@ -227,7 +226,7 @@ async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         try:
             await query.edit_message_text(
-                text=f"❌ An error occurred. Please try again or start over with /cancel."
+                text="❌ An error occurred. Please try again or start over with /cancel."
             )
         except Exception as inner_e:
             log_error(f"Error sending error message: {inner_e}", exc_info=True)
