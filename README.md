@@ -1,2 +1,1 @@
-# Notaai-
-Nota ai di Indo Pertama
+# Nota AI — bootstrap
