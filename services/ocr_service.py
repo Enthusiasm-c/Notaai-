@@ -87,9 +87,7 @@ async def extract(image_bytes):
                         {"type": "text", "text": OCR_PROMPT},
                         {
                             "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            },
+                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
                         },
                     ],
                 },
@@ -109,9 +107,7 @@ async def extract(image_bytes):
             ) as response:
                 if response.status != 200:
                     response_text = await response.text()
-                    error_msg = (
-                        f"OpenAI API returned status {response.status}: {response_text}"
-                    )
+                    error_msg = f"OpenAI API returned status {response.status}: {response_text}"
                     log_error(error_msg)
                     raise Exception(error_msg)
 
@@ -155,9 +151,7 @@ async def extract(image_bytes):
             error_dir = "logs/errors/ocr_responses"
             os.makedirs(error_dir, exist_ok=True)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            with open(
-                f"{error_dir}/response_{timestamp}.txt", "w", encoding="utf-8"
-            ) as f:
+            with open(f"{error_dir}/response_{timestamp}.txt", "w", encoding="utf-8") as f:
                 f.write(content)
 
             # Возвращаем пустую структуру

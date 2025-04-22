@@ -24,13 +24,9 @@ def log_error(message, exc_info=None):
     if exc_info:
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         os.makedirs("logs/errors/detailed", exist_ok=True)
-        with open(
-            f"logs/errors/detailed/error_{timestamp}.log", "w", encoding="utf-8"
-        ) as f:
+        with open(f"logs/errors/detailed/error_{timestamp}.log", "w", encoding="utf-8") as f:
             f.write(f"Error: {message}\n\n")
-            traceback.print_exception(
-                type(exc_info), exc_info, exc_info.__traceback__, file=f
-            )
+            traceback.print_exception(type(exc_info), exc_info, exc_info.__traceback__, file=f)
 
 
 def save_error_image(user_id, photo_bytes):

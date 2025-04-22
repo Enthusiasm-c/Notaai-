@@ -4,9 +4,15 @@ import sys
 
 from dotenv import load_dotenv
 from telegram import Update
-from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
-                          ContextTypes, ConversationHandler, MessageHandler,
-                          filters)
+from telegram.ext import (
+    Application,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+    ConversationHandler,
+    MessageHandler,
+    filters,
+)
 
 # Добавляем текущую директорию в пути поиска модулей
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -96,9 +102,7 @@ def log_error(message, exc_info=None):
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         os.makedirs("logs/errors/detailed", exist_ok=True)
         with open(f"logs/errors/detailed/error_{timestamp}.log", "w") as f:
-            traceback.print_exception(
-                type(exc_info), exc_info, exc_info.__traceback__, file=f
-            )
+            traceback.print_exception(type(exc_info), exc_info, exc_info.__traceback__, file=f)
 
 
 # Импортируем явно функции из других модулей
@@ -115,12 +119,14 @@ def import_modules():
         from handlers.command_handlers import cancel, help_command, start
         from handlers.confirmation_handlers import handle_confirmation
         from handlers.invoice_handlers import process_photo
-        from handlers.item_handlers import (handle_conversion_callback,
-                                            handle_conversion_entry,
-                                            handle_item_edit,
-                                            handle_item_selection,
-                                            handle_manual_entry_callback,
-                                            handle_manual_item_entry)
+        from handlers.item_handlers import (
+            handle_conversion_callback,
+            handle_conversion_entry,
+            handle_item_edit,
+            handle_item_selection,
+            handle_manual_entry_callback,
+            handle_manual_item_entry,
+        )
 
         return True
     except ImportError:
@@ -149,9 +155,7 @@ def import_modules():
             item_handlers = load_module(
                 "item_handlers", os.path.join(current_dir, "handlers/item_handlers.py")
             )
-            learning = load_module(
-                "learning", os.path.join(current_dir, "data/learning.py")
-            )
+            learning = load_module("learning", os.path.join(current_dir, "data/learning.py"))
 
             # Присваиваем функции из модулей
             start = command_handlers.start
@@ -219,15 +223,11 @@ def main():
                 EDIT_ITEM: [CallbackQueryHandler(handle_item_edit)],
                 ADD_NEW_ITEM: [
                     CallbackQueryHandler(handle_manual_entry_callback),
-                    MessageHandler(
-                        filters.TEXT & ~filters.COMMAND, handle_manual_item_entry
-                    ),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_manual_item_entry),
                 ],
                 SET_CONVERSION: [
                     CallbackQueryHandler(handle_conversion_callback),
-                    MessageHandler(
-                        filters.TEXT & ~filters.COMMAND, handle_conversion_entry
-                    ),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_conversion_entry),
                 ],
                 FINAL_CONFIRMATION: [CallbackQueryHandler(handle_confirmation)],
                 CONFIRM_ADD_NEW: [CallbackQueryHandler(handle_manual_entry_callback)],

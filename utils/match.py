@@ -168,9 +168,7 @@ def save_product(product_id: str, product_name: str, category: str = "") -> bool
 
         # Добавляем товар в кэш
         if _products_cache is not None:
-            _products_cache.append(
-                {"id": product_id, "name": product_name, "category": category}
-            )
+            _products_cache.append({"id": product_id, "name": product_name, "category": category})
 
         logger.info(f"Saved new product: {product_name} (ID: {product_id})")
         return True

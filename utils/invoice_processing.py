@@ -34,9 +34,7 @@ async def match_invoice_items(invoice_data: Dict) -> Dict:
                 # Используем сопоставление из обученных данных
                 matched_data["lines"][i]["product_id"] = learned_match["product_id"]
                 matched_data["lines"][i]["match_score"] = 1.0  # Идеальное совпадение
-                matched_data["lines"][i]["learned_name"] = learned_match[
-                    "corrected_name"
-                ]
+                matched_data["lines"][i]["learned_name"] = learned_match["corrected_name"]
                 logger.info(
                     f"Used learned mapping for '{item_name}' -> '{learned_match['corrected_name']}'"
                 )
@@ -122,16 +120,12 @@ def format_invoice_data(data: Dict) -> str:
     # Подсчитываем количество сопоставленных товаров
     total_items = len(matched_data.get("lines", []))
     matched_items = sum(
-        1
-        for line in matched_data.get("lines", [])
-        if line.get("product_id") is not None
+        1 for line in matched_data.get("lines", []) if line.get("product_id") is not None
     )
     unmatched_items = total_items - matched_items
 
     result = []
-    result.append(
-        f"📑 Invoice from supplier: {invoice_data.get('supplier', 'Not specified')}"
-    )
+    result.append(f"📑 Invoice from supplier: {invoice_data.get('supplier', 'Not specified')}")
     result.append(f"📆 Date: {invoice_data.get('date', 'Not specified')}\n")
 
     result.append(f"📊 General information:")
@@ -181,9 +175,7 @@ def format_invoice_data(data: Dict) -> str:
     # Показываем только количество других распознанных товаров без подробностей
     auto_matched = matched_items - len(learned_items)
     if auto_matched > 0:
-        result.append(
-            f"\n✅ {auto_matched} other items successfully matched with the database."
-        )
+        result.append(f"\n✅ {auto_matched} other items successfully matched with the database.")
 
     return "\n".join(result)
 
@@ -210,9 +202,7 @@ def format_final_invoice(data: Dict) -> str:
     total_sum = 0
 
     result.append(f"📊 ITEMS:")
-    result.append(
-        f"{'#':<4} {'Item Name':<30} {'Qty':<10} {'Unit':<8} {'Price':<12} {'Total':<12}"
-    )
+    result.append(f"{'#':<4} {'Item Name':<30} {'Qty':<10} {'Unit':<8} {'Price':<12} {'Total':<12}")
     result.append("-" * 80)
 
     for i, line in enumerate(matched_data.get("lines", [])):
@@ -309,9 +299,7 @@ async def check_product_exists(item_name: str) -> Tuple[bool, Optional[str]]:
     # В реальной реализации будет запрос к базе данных
 
     # Проверяем на точное совпадение
-    product_id, score = match(
-        item_name, threshold=0.95
-    )  # Высокий порог для "точного" совпадения
+    product_id, score = match(item_name, threshold=0.95)  # Высокий порог для "точного" совпадения
 
     if product_id:
         return True, product_id

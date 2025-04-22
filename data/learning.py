@@ -41,9 +41,7 @@ def load_learned_mappings():
                         "product_id": row.get("product_id", ""),
                         "corrected_name": row.get("corrected_name", ""),
                     }
-        logger.info(
-            f"Loaded {len(mappings)} learned mappings from {LEARNED_MAPPINGS_FILE}"
-        )
+        logger.info(f"Loaded {len(mappings)} learned mappings from {LEARNED_MAPPINGS_FILE}")
         learned_mappings = mappings
         return mappings
     except Exception as e:
@@ -90,9 +88,7 @@ def load_unit_conversions():
                         "target_unit": row.get("target_unit", ""),
                         "conversion_factor": float(row.get("conversion_factor", 1.0)),
                     }
-        logger.info(
-            f"Loaded {len(conversions)} unit conversions from {UNIT_CONVERSIONS_FILE}"
-        )
+        logger.info(f"Loaded {len(conversions)} unit conversions from {UNIT_CONVERSIONS_FILE}")
         unit_conversions = conversions
         return conversions
     except Exception as e:
@@ -133,18 +129,14 @@ def save_learned_mapping(original_name, product_id, corrected_name):
             "corrected_name": corrected_name,
         }
 
-        logger.info(
-            f"Saved new mapping: {original_name} -> {corrected_name} (ID: {product_id})"
-        )
+        logger.info(f"Saved new mapping: {original_name} -> {corrected_name} (ID: {product_id})")
         return True
     except Exception as e:
         log_error(f"Error saving learned mapping: {e}", exc_info=True)
         return False
 
 
-def save_unit_conversion(
-    product_id, product_name, source_unit, target_unit, conversion_factor
-):
+def save_unit_conversion(product_id, product_name, source_unit, target_unit, conversion_factor):
     """
     Сохранение конвертации единиц измерения в CSV файл
 
@@ -179,9 +171,7 @@ def save_unit_conversion(
                 )
 
             # Записываем новую конвертацию
-            writer.writerow(
-                [product_id, product_name, source_unit, target_unit, conversion_factor]
-            )
+            writer.writerow([product_id, product_name, source_unit, target_unit, conversion_factor])
 
         # Обновляем конвертации в памяти
         key = (product_id, source_unit.lower())

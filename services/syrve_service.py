@@ -70,9 +70,7 @@ async def authenticate():
                     if token_elem is not None:
                         auth_token = token_elem.text
                         # Устанавливаем срок действия токена на 1 час
-                        auth_token_expiry = (
-                            datetime.datetime.now() + datetime.timedelta(hours=1)
-                        )
+                        auth_token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
                         logger.info("Authentication successful")
                         return auth_token
 
@@ -148,9 +146,7 @@ async def send_invoice_to_syrve(token, invoice_data):
             async with session.post(url, data=xml_data, headers=headers) as response:
                 if response.status != 200:
                     response_text = await response.text()
-                    log_error(
-                        f"Failed to send invoice: HTTP {response.status}, {response_text}"
-                    )
+                    log_error(f"Failed to send invoice: HTTP {response.status}, {response_text}")
                     return None
 
                 response_text = await response.text()
@@ -170,14 +166,10 @@ async def send_invoice_to_syrve(token, invoice_data):
                     if valid_elem is not None and valid_elem.text.lower() == "true":
                         # Документ успешно отправлен, но ID не вернулся
                         document_number = invoice_data.get("number", "")
-                        logger.info(
-                            f"Invoice successfully submitted: {document_number}"
-                        )
+                        logger.info(f"Invoice successfully submitted: {document_number}")
                         return document_number
 
-                    log_error(
-                        f"Could not get document ID from response: {response_text}"
-                    )
+                    log_error(f"Could not get document ID from response: {response_text}")
                     return None
                 except Exception as e:
                     log_error(f"Error parsing response XML: {e}", exc_info=True)
@@ -218,9 +210,7 @@ async def commit_document(token, document_id):
             async with session.post(url, data=xml_data, headers=headers) as response:
                 if response.status != 200:
                     response_text = await response.text()
-                    log_error(
-                        f"Failed to commit document: HTTP {response.status}, {response_text}"
-                    )
+                    log_error(f"Failed to commit document: HTTP {response.status}, {response_text}")
                     return False
 
                 response_text = await response.text()
@@ -265,9 +255,7 @@ async def get_stores(token):
             async with session.get(url) as response:
                 if response.status != 200:
                     response_text = await response.text()
-                    log_error(
-                        f"Failed to get stores: HTTP {response.status}, {response_text}"
-                    )
+                    log_error(f"Failed to get stores: HTTP {response.status}, {response_text}")
                     return []
 
                 response_text = await response.text()
@@ -283,9 +271,7 @@ async def get_stores(token):
                         store_name = store_elem.find("name")
 
                         if store_id is not None and store_name is not None:
-                            stores.append(
-                                {"id": store_id.text, "name": store_name.text}
-                            )
+                            stores.append({"id": store_id.text, "name": store_name.text})
 
                     logger.info(f"Retrieved {len(stores)} stores")
                     return stores
@@ -317,9 +303,7 @@ async def get_products(token):
             async with session.get(url) as response:
                 if response.status != 200:
                     response_text = await response.text()
-                    log_error(
-                        f"Failed to get products: HTTP {response.status}, {response_text}"
-                    )
+                    log_error(f"Failed to get products: HTTP {response.status}, {response_text}")
                     return []
 
                 response_text = await response.text()
@@ -335,9 +319,7 @@ async def get_products(token):
                         product_name = product_elem.find("name")
 
                         if product_id is not None and product_name is not None:
-                            products.append(
-                                {"id": product_id.text, "name": product_name.text}
-                            )
+                            products.append({"id": product_id.text, "name": product_name.text})
 
                     logger.info(f"Retrieved {len(products)} products")
                     return products

@@ -91,9 +91,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         if user_id in user_data:
             del user_data[user_id]
 
-        await update.message.reply_text(
-            "Operation canceled. Send a new invoice photo when ready."
-        )
+        await update.message.reply_text("Operation canceled. Send a new invoice photo when ready.")
         return WAIT_PHOTO
     except Exception as e:
         log_error(f"Error in cancel command: {e}", exc_info=True)

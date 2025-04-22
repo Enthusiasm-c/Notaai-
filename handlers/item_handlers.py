@@ -6,8 +6,15 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from config import (ADD_NEW_ITEM, CONFIRMATION, EDIT_ITEM, SELECT_EDIT_ITEM,
-                    SET_CONVERSION, WAIT_PHOTO, user_data)
+from config import (
+    ADD_NEW_ITEM,
+    CONFIRMATION,
+    EDIT_ITEM,
+    SELECT_EDIT_ITEM,
+    SET_CONVERSION,
+    WAIT_PHOTO,
+    user_data,
+)
 from data.learning import save_learned_mapping, save_unit_conversion
 from utils.error_handling import log_error
 from utils.invoice_processing import check_product_exists, format_invoice_data
@@ -43,11 +50,7 @@ async def display_item_selection(query, user_id):
 
         # Добавляем кнопку для редактирования
         keyboard.append(
-            [
-                InlineKeyboardButton(
-                    f"Edit item #{line_num}", callback_data=f"edit_item:{i}"
-                )
-            ]
+            [InlineKeyboardButton(f"Edit item #{line_num}", callback_data=f"edit_item:{i}")]
         )
 
     # Добавляем кнопки навигации
@@ -63,9 +66,7 @@ async def display_item_selection(query, user_id):
     await query.edit_message_text(text=message_text, reply_markup=reply_markup)
 
 
-async def handle_item_selection(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
+async def handle_item_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Обработчик выбора товара для редактирования
 
@@ -102,33 +103,19 @@ async def handle_item_selection(
 
             if unmatched_items:
                 keyboard.append(
-                    [
-                        InlineKeyboardButton(
-                            "Fix Unrecognized Items", callback_data="edit_unmatched"
-                        )
-                    ]
+                    [InlineKeyboardButton("Fix Unrecognized Items", callback_data="edit_unmatched")]
                 )
 
             keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        "Review & Edit Items", callback_data="select_edit_item"
-                    )
-                ]
+                [InlineKeyboardButton("Review & Edit Items", callback_data="select_edit_item")]
             )
 
             if not unmatched_items:
                 keyboard.append(
-                    [
-                        InlineKeyboardButton(
-                            "Confirm & Preview Final", callback_data="final_preview"
-                        )
-                    ]
+                    [InlineKeyboardButton("Confirm & Preview Final", callback_data="final_preview")]
                 )
 
-            keyboard.append(
-                [InlineKeyboardButton("Cancel", callback_data="cancel_process")]
-            )
+            keyboard.append([InlineKeyboardButton("Cancel", callback_data="cancel_process")])
 
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -139,9 +126,7 @@ async def handle_item_selection(
             if user_id in user_data:
                 del user_data[user_id]
 
-            await query.edit_message_text(
-                text="Operation canceled. Send a new invoice photo."
-            )
+            await query.edit_message_text(text="Operation canceled. Send a new invoice photo.")
             return WAIT_PHOTO
 
         elif query.data.startswith("edit_item:"):
@@ -206,9 +191,7 @@ async def display_item_edit_options(query, user_id, item_index):
     unmatched_indices = []
     if is_unrecognized:
         unmatched_indices = [
-            i
-            for i, l in enumerate(matched_data.get("lines", []))
-            if l.get("product_id") is None
+            i for i, l in enumerate(matched_data.get("lines", [])) if l.get("product_id") is None
         ]
         current_position = unmatched_indices.index(item_index) + 1
         total_unmatched = len(unmatched_indices)
@@ -234,11 +217,7 @@ async def display_item_edit_options(query, user_id, item_index):
 
     # Базовые действия для всех товаров
     keyboard.append(
-        [
-            InlineKeyboardButton(
-                "Enter correct item", callback_data=f"manual_match:{item_index}"
-            )
-        ]
+        [InlineKeyboardButton("Enter correct item", callback_data=f"manual_match:{item_index}")]
     )
     keyboard.append(
         [InlineKeyboardButton("Add as new item", callback_data=f"add_new:{item_index}")]
@@ -260,11 +239,7 @@ async def display_item_edit_options(query, user_id, item_index):
 
     # Кнопка для конвертации единиц измерения
     keyboard.append(
-        [
-            InlineKeyboardButton(
-                "Set unit conversion", callback_data=f"set_conversion:{item_index}"
-            )
-        ]
+        [InlineKeyboardButton("Set unit conversion", callback_data=f"set_conversion:{item_index}")]
     )
 
     # Кнопки навигации
@@ -272,27 +247,19 @@ async def display_item_edit_options(query, user_id, item_index):
 
     # Кнопка возврата к предыдущему шагу, если есть история
     if user_data[user_id].get("edit_history"):
-        nav_row.append(
-            InlineKeyboardButton("Previous Step", callback_data="previous_step")
-        )
+        nav_row.append(InlineKeyboardButton("Previous Step", callback_data="previous_step"))
 
     # Добавляем кнопки возврата
     if is_unrecognized:
-        nav_row.append(
-            InlineKeyboardButton("Back to Main", callback_data="back_to_main")
-        )
+        nav_row.append(InlineKeyboardButton("Back to Main", callback_data="back_to_main"))
     else:
-        nav_row.append(
-            InlineKeyboardButton("Back to Item List", callback_data="back_to_selection")
-        )
+        nav_row.append(InlineKeyboardButton("Back to Item List", callback_data="back_to_selection"))
 
     if nav_row:
         keyboard.append(nav_row)
 
     # Кнопка отмены
-    keyboard.append(
-        [InlineKeyboardButton("Cancel Operation", callback_data="cancel_process")]
-    )
+    keyboard.append([InlineKeyboardButton("Cancel Operation", callback_data="cancel_process")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -316,10 +283,7 @@ async def handle_item_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
         user_id = query.from_user.id
 
-        if (
-            user_id not in user_data
-            or user_data[user_id].get("current_edit_index") is None
-        ):
+        if user_id not in user_data or user_data[user_id].get("current_edit_index") is None:
             await query.edit_message_text("Error: Editing data not found.")
             return WAIT_PHOTO
 
@@ -355,9 +319,7 @@ async def handle_item_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     InlineKeyboardButton(
                         "Yes, add as new", callback_data=f"confirm_add_new:{item_index}"
                     ),
-                    InlineKeyboardButton(
-                        "No, go back", callback_data=f"back_to_edit:{item_index}"
-                    ),
+                    InlineKeyboardButton("No, go back", callback_data=f"back_to_edit:{item_index}"),
                 ]
             ]
 
@@ -375,13 +337,9 @@ async def handle_item_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             item_name = matched_data["lines"][item_index].get("name", "")
 
             # Генерируем новый ID товара
-            new_product_id = (
-                f"new_{item_index}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-            )
+            new_product_id = f"new_{item_index}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
             matched_data["lines"][item_index]["product_id"] = new_product_id
-            matched_data["lines"][item_index][
-                "match_score"
-            ] = 1.0  # Идеальное совпадение
+            matched_data["lines"][item_index]["match_score"] = 1.0  # Идеальное совпадение
 
             # Сохраняем сопоставление
             save_learned_mapping(item_name, new_product_id, item_name)
@@ -417,11 +375,7 @@ async def handle_item_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                                     callback_data="final_preview",
                                 )
                             ],
-                            [
-                                InlineKeyboardButton(
-                                    "Cancel", callback_data="cancel_process"
-                                )
-                            ],
+                            [InlineKeyboardButton("Cancel", callback_data="cancel_process")],
                         ]
                     ),
                 )
@@ -503,40 +457,24 @@ async def handle_item_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
             # Проверяем наличие неопознанных товаров
             unmatched_items = [
-                item
-                for item in matched_data.get("lines", [])
-                if item.get("product_id") is None
+                item for item in matched_data.get("lines", []) if item.get("product_id") is None
             ]
 
             if unmatched_items:
                 keyboard.append(
-                    [
-                        InlineKeyboardButton(
-                            "Fix Unrecognized Items", callback_data="edit_unmatched"
-                        )
-                    ]
+                    [InlineKeyboardButton("Fix Unrecognized Items", callback_data="edit_unmatched")]
                 )
 
             keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        "Review & Edit Items", callback_data="select_edit_item"
-                    )
-                ]
+                [InlineKeyboardButton("Review & Edit Items", callback_data="select_edit_item")]
             )
 
             if not unmatched_items:
                 keyboard.append(
-                    [
-                        InlineKeyboardButton(
-                            "Confirm & Preview Final", callback_data="final_preview"
-                        )
-                    ]
+                    [InlineKeyboardButton("Confirm & Preview Final", callback_data="final_preview")]
                 )
 
-            keyboard.append(
-                [InlineKeyboardButton("Cancel", callback_data="cancel_process")]
-            )
+            keyboard.append([InlineKeyboardButton("Cancel", callback_data="cancel_process")])
 
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -548,9 +486,7 @@ async def handle_item_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             if user_id in user_data:
                 del user_data[user_id]
 
-            await query.edit_message_text(
-                text="Operation canceled. Send a new invoice photo."
-            )
+            await query.edit_message_text(text="Operation canceled. Send a new invoice photo.")
             return WAIT_PHOTO
 
         return EDIT_ITEM
@@ -569,9 +505,7 @@ async def handle_item_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return WAIT_PHOTO
 
 
-async def handle_manual_item_entry(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
+async def handle_manual_item_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Обработчик ручного ввода названия товара
 
@@ -611,13 +545,9 @@ async def handle_manual_item_entry(
 
         if exists and product_id:
             # Товар существует, используем найденный ID
-            user_data[user_id]["matched_data"]["lines"][item_index][
-                "product_id"
-            ] = product_id
+            user_data[user_id]["matched_data"]["lines"][item_index]["product_id"] = product_id
             user_data[user_id]["matched_data"]["lines"][item_index]["match_score"] = 1.0
-            user_data[user_id]["matched_data"]["lines"][item_index][
-                "manual_name"
-            ] = entered_name
+            user_data[user_id]["matched_data"]["lines"][item_index]["manual_name"] = entered_name
 
             # Сохраняем это сопоставление для будущего использования
             save_learned_mapping(original_name, product_id, entered_name)
@@ -691,11 +621,7 @@ async def handle_manual_item_entry(
             # Добавляем кнопку возврата к предыдущему шагу
             if user_data[user_id].get("edit_history"):
                 keyboard.append(
-                    [
-                        InlineKeyboardButton(
-                            "Previous Step", callback_data="previous_step"
-                        )
-                    ]
+                    [InlineKeyboardButton("Previous Step", callback_data="previous_step")]
                 )
 
             # Добавляем кнопки навигации
@@ -748,11 +674,7 @@ async def handle_manual_item_entry(
                                 "Review Final Invoice", callback_data="final_preview"
                             )
                         ],
-                        [
-                            InlineKeyboardButton(
-                                "Cancel", callback_data="cancel_process"
-                            )
-                        ],
+                        [InlineKeyboardButton("Cancel", callback_data="cancel_process")],
                     ]
                 ),
             )
@@ -768,9 +690,7 @@ async def handle_manual_item_entry(
         return WAIT_PHOTO
 
 
-async def handle_manual_entry_callback(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
+async def handle_manual_entry_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Обработчик колбэков при ручном вводе товара
 
@@ -806,21 +726,17 @@ async def handle_manual_entry_callback(
                 ):
                     await query.edit_message_text("Error: Item name data not found.")
                     return EDIT_ITEM
-                entered_name = context.user_data["awaiting_item_name"].get(
-                    "entered_name", ""
-                )
+                entered_name = context.user_data["awaiting_item_name"].get("entered_name", "")
 
             original_name = context.user_data["awaiting_item_name"]["original_name"]
 
             # Генерируем новый ID товара
-            new_product_id = f"manual_new_{item_index}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-            user_data[user_id]["matched_data"]["lines"][item_index][
-                "product_id"
-            ] = new_product_id
+            new_product_id = (
+                f"manual_new_{item_index}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+            )
+            user_data[user_id]["matched_data"]["lines"][item_index]["product_id"] = new_product_id
             user_data[user_id]["matched_data"]["lines"][item_index]["match_score"] = 1.0
-            user_data[user_id]["matched_data"]["lines"][item_index][
-                "manual_name"
-            ] = entered_name
+            user_data[user_id]["matched_data"]["lines"][item_index]["manual_name"] = entered_name
 
             # Сохраняем сопоставление
             save_learned_mapping(original_name, new_product_id, entered_name)
@@ -862,11 +778,7 @@ async def handle_manual_entry_callback(
                                     callback_data="final_preview",
                                 )
                             ],
-                            [
-                                InlineKeyboardButton(
-                                    "Cancel", callback_data="cancel_process"
-                                )
-                            ],
+                            [InlineKeyboardButton("Cancel", callback_data="cancel_process")],
                         ]
                     ),
                 )
@@ -875,9 +787,7 @@ async def handle_manual_entry_callback(
         # Повторная попытка ввода названия товара
         elif query.data.startswith("retry_manual:"):
             item_index = int(query.data.split(":")[1])
-            item_name = user_data[user_id]["matched_data"]["lines"][item_index].get(
-                "name", ""
-            )
+            item_name = user_data[user_id]["matched_data"]["lines"][item_index].get("name", "")
 
             await query.edit_message_text(
                 text=f"Please try entering a different name for '{item_name}'.\n\n"
@@ -906,9 +816,7 @@ async def handle_manual_entry_callback(
             if "awaiting_item_name" in context.user_data:
                 del context.user_data["awaiting_item_name"]
 
-            await query.edit_message_text(
-                text="Operation canceled. Send a new invoice photo."
-            )
+            await query.edit_message_text(text="Operation canceled. Send a new invoice photo.")
             return WAIT_PHOTO
 
         return ADD_NEW_ITEM
@@ -927,9 +835,7 @@ async def handle_manual_entry_callback(
         return WAIT_PHOTO
 
 
-async def handle_conversion_entry(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
+async def handle_conversion_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Обработчик ввода данных для конвертации единиц измерения
 
@@ -990,7 +896,9 @@ async def handle_conversion_entry(
 
                 if not product_id:
                     # Если товар не распознан, генерируем временный ID
-                    product_id = f"temp_{item_index}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    product_id = (
+                        f"temp_{item_index}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    )
                     matched_data["lines"][item_index]["product_id"] = product_id
 
                 # Сохраняем конвертацию в базу данных
@@ -1059,18 +967,12 @@ async def handle_conversion_entry(
 
                 keyboard.append(
                     [
-                        InlineKeyboardButton(
-                            "Review all items", callback_data="select_edit_item"
-                        ),
-                        InlineKeyboardButton(
-                            "Back to Main", callback_data="back_to_main"
-                        ),
+                        InlineKeyboardButton("Review all items", callback_data="select_edit_item"),
+                        InlineKeyboardButton("Back to Main", callback_data="back_to_main"),
                     ]
                 )
 
-                keyboard.append(
-                    [InlineKeyboardButton("Cancel", callback_data="cancel_process")]
-                )
+                keyboard.append([InlineKeyboardButton("Cancel", callback_data="cancel_process")])
 
                 await update.message.reply_text(
                     "What would you like to do next?",
@@ -1099,9 +1001,7 @@ async def handle_conversion_entry(
         return WAIT_PHOTO
 
 
-async def handle_conversion_callback(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
+async def handle_conversion_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Обработчик колбэков при настройке конвертации единиц измерения
 
@@ -1129,9 +1029,7 @@ async def handle_conversion_callback(
             if "setting_conversion" in context.user_data:
                 del context.user_data["setting_conversion"]
 
-            await query.edit_message_text(
-                text="Operation canceled. Send a new invoice photo."
-            )
+            await query.edit_message_text(text="Operation canceled. Send a new invoice photo.")
             return WAIT_PHOTO
 
         elif query.data == "back_to_edit" and "setting_conversion" in context.user_data:

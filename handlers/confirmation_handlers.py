@@ -4,24 +4,29 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from config import (CONFIRMATION, EDIT_ITEM, FINAL_CONFIRMATION,
-                    SELECT_EDIT_ITEM, WAIT_PHOTO, user_data)
+from config import (
+    CONFIRMATION,
+    EDIT_ITEM,
+    FINAL_CONFIRMATION,
+    SELECT_EDIT_ITEM,
+    WAIT_PHOTO,
+    user_data,
+)
 from handlers.item_handlers import display_item_selection
-from services.syrve_service import (authenticate, commit_document,
-                                    send_invoice_to_syrve)
+from services.syrve_service import authenticate, commit_document, send_invoice_to_syrve
 from utils.error_handling import log_error
-from utils.invoice_processing import (format_final_invoice,
-                                      format_invoice_data,
-                                      prepare_invoice_data_for_syrve,
-                                      save_invoice_data)
+from utils.invoice_processing import (
+    format_final_invoice,
+    format_invoice_data,
+    prepare_invoice_data_for_syrve,
+    save_invoice_data,
+)
 
 # Получаем логгер
 logger = logging.getLogger(__name__)
 
 
-async def handle_confirmation(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
+async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Обработчик подтверждения или редактирования результатов
 
@@ -44,15 +49,11 @@ async def handle_confirmation(
 
         # Действие: Окончательное подтверждение и отправка в Syrve
         if query.data == "confirm":
-            await query.edit_message_text(
-                text="✅ Confirmed! Saving data and sending to Syrve..."
-            )
+            await query.edit_message_text(text="✅ Confirmed! Saving data and sending to Syrve...")
 
             try:
                 # Сохраняем данные в файл
-                filename = save_invoice_data(
-                    user_id, user_data[user_id]["matched_data"]
-                )
+                filename = save_invoice_data(user_id, user_data[user_id]["matched_data"])
 
                 # Получаем токен для доступа к Syrve API
                 logger.info(f"Authenticating with Syrve API")
@@ -66,9 +67,7 @@ async def handle_confirmation(
                     return WAIT_PHOTO
 
                 # Преобразуем данные в формат для отправки в Syrve
-                invoice_data = prepare_invoice_data_for_syrve(
-                    user_data[user_id]["matched_data"]
-                )
+                invoice_data = prepare_invoice_data_for_syrve(user_data[user_id]["matched_data"])
 
                 # Отправляем данные в Syrve
                 logger.info(f"Sending invoice data to Syrve")
@@ -76,9 +75,7 @@ async def handle_confirmation(
 
                 if document_id:
                     # Проводим документ в Syrve
-                    logger.info(
-                        f"Invoice sent successfully, committing document {document_id}"
-                    )
+                    logger.info(f"Invoice sent successfully, committing document {document_id}")
                     commit_success = await commit_document(token, document_id)
 
                     if commit_success:
@@ -117,9 +114,7 @@ async def handle_confirmation(
             if user_id in user_data:
                 del user_data[user_id]
 
-            await query.edit_message_text(
-                text="Operation canceled. Send a new invoice photo."
-            )
+            await query.edit_message_text(text="Operation canceled. Send a new invoice photo.")
             return WAIT_PHOTO
 
         # Действие: Редактирование неопознанных товаров
@@ -157,11 +152,7 @@ async def handle_confirmation(
                                     callback_data="final_preview",
                                 )
                             ],
-                            [
-                                InlineKeyboardButton(
-                                    "Cancel", callback_data="cancel_process"
-                                )
-                            ],
+                            [InlineKeyboardButton("Cancel", callback_data="cancel_process")],
                         ]
                     ),
                 )
@@ -181,9 +172,7 @@ async def handle_confirmation(
             keyboard = [
                 [
                     InlineKeyboardButton("Confirm & Send", callback_data="confirm"),
-                    InlineKeyboardButton(
-                        "Edit Items", callback_data="select_edit_item"
-                    ),
+                    InlineKeyboardButton("Edit Items", callback_data="select_edit_item"),
                 ],
                 [InlineKeyboardButton("Back to Main", callback_data="back_to_main")],
                 [InlineKeyboardButton("Cancel", callback_data="cancel_process")],
@@ -211,33 +200,19 @@ async def handle_confirmation(
 
             if unmatched_items:
                 keyboard.append(
-                    [
-                        InlineKeyboardButton(
-                            "Fix Unrecognized Items", callback_data="edit_unmatched"
-                        )
-                    ]
+                    [InlineKeyboardButton("Fix Unrecognized Items", callback_data="edit_unmatched")]
                 )
 
             keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        "Review & Edit Items", callback_data="select_edit_item"
-                    )
-                ]
+                [InlineKeyboardButton("Review & Edit Items", callback_data="select_edit_item")]
             )
 
             if not unmatched_items:
                 keyboard.append(
-                    [
-                        InlineKeyboardButton(
-                            "Confirm & Preview Final", callback_data="final_preview"
-                        )
-                    ]
+                    [InlineKeyboardButton("Confirm & Preview Final", callback_data="final_preview")]
                 )
 
-            keyboard.append(
-                [InlineKeyboardButton("Cancel", callback_data="cancel_process")]
-            )
+            keyboard.append([InlineKeyboardButton("Cancel", callback_data="cancel_process")])
 
             reply_markup = InlineKeyboardMarkup(keyboard)
 

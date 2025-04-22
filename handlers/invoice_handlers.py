@@ -8,8 +8,11 @@ from telegram.ext import ContextTypes
 from config import CONFIRMATION, WAIT_PHOTO, user_data
 from services.ocr_service import extract
 from utils.error_handling import log_error, save_error_image
-from utils.invoice_processing import (apply_unit_conversions,
-                                      format_invoice_data, match_invoice_items)
+from utils.invoice_processing import (
+    apply_unit_conversions,
+    format_invoice_data,
+    match_invoice_items,
+)
 
 # Получаем логгер
 logger = logging.getLogger(__name__)
@@ -76,40 +79,24 @@ async def process_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
         # Проверяем наличие неопознанных товаров
         unmatched_items = [
-            item
-            for item in matched_data.get("lines", [])
-            if item.get("product_id") is None
+            item for item in matched_data.get("lines", []) if item.get("product_id") is None
         ]
 
         if unmatched_items:
             keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        "Fix Unrecognized Items", callback_data="edit_unmatched"
-                    )
-                ]
+                [InlineKeyboardButton("Fix Unrecognized Items", callback_data="edit_unmatched")]
             )
 
         keyboard.append(
-            [
-                InlineKeyboardButton(
-                    "Review & Edit Items", callback_data="select_edit_item"
-                )
-            ]
+            [InlineKeyboardButton("Review & Edit Items", callback_data="select_edit_item")]
         )
 
         if not unmatched_items:
             keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        "Confirm & Preview Final", callback_data="final_preview"
-                    )
-                ]
+                [InlineKeyboardButton("Confirm & Preview Final", callback_data="final_preview")]
             )
 
-        keyboard.append(
-            [InlineKeyboardButton("Cancel", callback_data="cancel_process")]
-        )
+        keyboard.append([InlineKeyboardButton("Cancel", callback_data="cancel_process")])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
 
