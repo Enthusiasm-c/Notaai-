@@ -1,0 +1,283 @@
+{
+  "supplier": "UD. WIDI WIGUNA",
+  "date": "2025-04-20",
+  "lines": [
+    {
+      "line": 1,
+      "name": "mushroom",
+      "qty": 1,
+      "unit": "kg",
+      "price": 40000,
+      "product_id": "e3c0b3ce-a639-4605-bb7e-e2b324c21ab9",
+      "match_score": 0.8
+    },
+    {
+      "line": 2,
+      "name": "romaine",
+      "qty": 1,
+      "unit": "kg",
+      "price": 65000,
+      "product_id": "manual_12_20250421063622",
+      "match_score": 1.0,
+      "learned_name": "Lettuce romaine"
+    },
+    {
+      "line": 3,
+      "name": "english spinach",
+      "qty": 0.5,
+      "unit": "kg",
+      "price": 19500,
+      "product_id": "3a2907ac-77ee-485b-b46c-c92fcc810132",
+      "match_score": 1.0
+    },
+    {
+      "line": 4,
+      "name": "green bean",
+      "qty": 0.5,
+      "unit": "kg",
+      "price": 18000,
+      "product_id": "da657ef8-5c22-4b1d-b837-97c1fd133485",
+      "match_score": 0.9523809523809523
+    },
+    {
+      "line": 5,
+      "name": "tomato",
+      "qty": 1,
+      "unit": "kg",
+      "price": 15000,
+      "product_id": "ce3bf53f-67f2-4a13-9dcf-3bfeaef694e6",
+      "match_score": 0.75
+    },
+    {
+      "line": 6,
+      "name": "dill",
+      "qty": 1,
+      "unit": "kg",
+      "price": 40000,
+      "product_id": "91727b8e-da88-4920-ada4-c1dadd91bb9c",
+      "match_score": 1.0
+    },
+    {
+      "line": 7,
+      "name": "local spinach",
+      "qty": 2,
+      "unit": "kg",
+      "price": 15000,
+      "product_id": "4498e80a-c619-4e47-82b4-300b82963912",
+      "match_score": 0.7407407407407407
+    },
+    {
+      "line": 8,
+      "name": "potato",
+      "qty": 1,
+      "unit": "kg",
+      "price": 30000,
+      "product_id": "f100b5b8-cf53-4d4e-a353-eacae09e3b5a",
+      "match_score": 1.0
+    },
+    {
+      "line": 9,
+      "name": "hazelnut",
+      "qty": 0.2,
+      "unit": "kg",
+      "price": 255000,
+      "product_id": "846e1443-da60-49fb-be32-a4ae6ae65df5",
+      "match_score": 1.0
+    },
+    {
+      "line": 10,
+      "name": "baking paper",
+      "qty": 1,
+      "unit": "pack",
+      "price": 28500,
+      "product_id": "cc65b705-0905-4dda-98f8-0d9ea0d1426a",
+      "match_score": 0.8
+    },
+    {
+      "line": 11,
+      "name": "egg",
+      "qty": 1,
+      "unit": "krat",
+      "price": 656000,
+      "product_id": "5cd43ac8-2354-496d-9eb2-e51c973ff97e",
+      "match_score": 1.0
+    },
+    {
+      "line": 12,
+      "name": "flour biasa",
+      "qty": 1,
+      "unit": "kg",
+      "price": 12000,
+      "product_id": "e50d2ca0-a85b-48cb-8ac2-8e4f81d7e38b",
+      "match_score": 1.0,
+      "manual_name": "Wheat flour"
+    },
+    {
+      "line": 13,
+      "name": "corn starch",
+      "qty": 1,
+      "unit": "pack",
+      "price": 16000,
+      "product_id": "885c62ab-c384-47f4-b68b-325e52d883a0",
+      "match_score": 1.0
+    },
+    {
+      "line": 14,
+      "name": "hand glove M black",
+      "qty": 1,
+      "unit": "box",
+      "price": 85000,
+      "product_id": "829d439a-c61f-44ba-b457-8964f9edbbd4",
+      "match_score": 0.9787234042553191,
+      "manual_name": "Packaging and cash area"
+    },
+    {
+      "line": 15,
+      "name": "chickpeas",
+      "qty": 2,
+      "unit": "can",
+      "price": 32000,
+      "product_id": "fa5a343c-e4e0-4046-a477-4bfb6e3a7288",
+      "match_score": 1.0
+    },
+    {
+      "line": 16,
+      "name": "sunkist",
+      "qty": 2,
+      "unit": "pcs",
+      "price": 38400,
+      "product_id": "17dc5560-a631-4a53-ae58-faa3e2f9dee1",
+      "match_score": 1.0
+    },
+    {
+      "line": 17,
+      "name": "pineapple",
+      "qty": 1,
+      "unit": "pcs",
+      "price": 24000,
+      "product_id": "e19b29f2-7e61-4ca2-a285-b77ecd4a3ae5",
+      "match_score": 1.0
+    },
+    {
+      "line": 18,
+      "name": "dragon fruit",
+      "qty": 4,
+      "unit": "pcs",
+      "price": 60000,
+      "product_id": "9ef71292-7c56-4835-ac04-fb4d68749a23",
+      "match_score": 1.0
+    },
+    {
+      "line": 19,
+      "name": "king paprica",
+      "qty": 5,
+      "unit": "kg",
+      "price": 175000,
+      "product_id": "e8abc91b-51ad-4ab9-a1e8-c96f56f02971",
+      "match_score": 1.0,
+      "manual_name": "Paprika fresh"
+    },
+    {
+      "line": 20,
+      "name": "paprica merah",
+      "qty": 2,
+      "unit": "kg",
+      "price": 78000,
+      "product_id": "e8abc91b-51ad-4ab9-a1e8-c96f56f02971",
+      "match_score": 0.7,
+      "manual_name": "Paprika"
+    },
+    {
+      "line": 21,
+      "name": "zuchini",
+      "qty": 3,
+      "unit": "kg",
+      "price": 54000,
+      "product_id": "91b6c537-c21b-4b94-90f2-db2737ce9e62",
+      "match_score": 0.9333333333333333
+    },
+    {
+      "line": 22,
+      "name": "cucumber",
+      "qty": 2,
+      "unit": "kg",
+      "price": 28000,
+      "product_id": "e0ae02a7-1e01-4edb-8608-7b04a67adbf3",
+      "match_score": 1.0
+    },
+    {
+      "line": 23,
+      "name": "chicken broest",
+      "qty": 1,
+      "unit": "kg",
+      "price": 44500,
+      "product_id": "61aa6384-2fe2-4d0c-aad8-73c5d5dc79c5",
+      "match_score": 0.7142857142857143
+    },
+    {
+      "line": 24,
+      "name": "lumelagn",
+      "qty": 1,
+      "unit": "kg",
+      "price": 33000,
+      "product_id": "manual_23_20250421074603",
+      "match_score": 1.0,
+      "manual_name": "Orange local"
+    },
+    {
+      "line": 25,
+      "name": "carrot",
+      "qty": 2,
+      "unit": "kg",
+      "price": 44000,
+      "product_id": "b50a1e7f-007a-44d3-9430-561fd652eca9",
+      "match_score": 1.0
+    },
+    {
+      "line": 26,
+      "name": "lemon",
+      "qty": 1,
+      "unit": "kg",
+      "price": 48000,
+      "product_id": "4a67a90d-7fe3-4961-8386-7fbd5219203b",
+      "match_score": 1.0
+    },
+    {
+      "line": 27,
+      "name": "apple lokal",
+      "qty": 2,
+      "unit": "kg",
+      "price": 40000,
+      "product_id": "9a9a302a-a137-453a-aa4a-64a4a73fcc1a",
+      "match_score": 1.0,
+      "learned_name": "Apple"
+    },
+    {
+      "line": 28,
+      "name": "watermelon",
+      "qty": 1,
+      "unit": "kg",
+      "price": 15000,
+      "product_id": "0a3697d0-6362-404b-89a7-cc6c57d1aa98",
+      "match_score": 1.0
+    },
+    {
+      "line": 29,
+      "name": "caramel",
+      "qty": 5,
+      "unit": "tbl",
+      "price": 175000,
+      "product_id": "2806f8f3-a2ce-4549-a855-e1eef59d5b28",
+      "match_score": 1.0
+    },
+    {
+      "line": 30,
+      "name": "eggplant",
+      "qty": 1,
+      "unit": "kg",
+      "price": 15000,
+      "product_id": "7caff932-546f-4031-b7a9-04a82ec59962",
+      "match_score": 1.0
+    }
+  ]
+}
