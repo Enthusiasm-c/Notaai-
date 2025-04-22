@@ -11,3 +11,4 @@ data/invoices/
 data/learned/
 # OS
 .DS_Store
+.venv/

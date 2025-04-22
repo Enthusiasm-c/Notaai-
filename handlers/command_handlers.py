@@ -1,4 +1,5 @@
 import logging
+
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -8,14 +9,15 @@ from utils.error_handling import log_error
 # Получаем логгер
 logger = logging.getLogger(__name__)
 
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Обработчик команды /start
-    
+
     Args:
         update: Входящее обновление
         context: Контекст
-        
+
     Returns:
         int: Следующее состояние диалога
     """
@@ -35,14 +37,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await update.message.reply_text("An error occurred. Please try again.")
         return WAIT_PHOTO
 
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Обработчик команды /help
-    
+
     Args:
         update: Входящее обновление
         context: Контекст
-        
+
     Returns:
         int: Следующее состояние диалога
     """
@@ -53,7 +56,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             "/start - Start working with the bot\n"
             "/help - Show this message\n"
             "/cancel - Cancel the current operation\n\n"
-            
             "How to use Nota AI:\n"
             "1. 📸 Send a photo of an invoice\n"
             "2. 🔍 I'll process the image and extract data\n"
@@ -61,7 +63,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             "4. 🔄 Set unit conversions if needed\n"
             "5. 📋 Review the final data before sending\n"
             "6. ✅ Confirm to send data to Syrve\n\n"
-            
             "Advanced Features:\n"
             "• You can edit any item before final confirmation\n"
             "• You can go back to previous steps if needed\n"
@@ -73,14 +74,15 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await update.message.reply_text("An error occurred. Please try again.")
         return WAIT_PHOTO
 
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Обработчик команды /cancel
-    
+
     Args:
         update: Входящее обновление
         context: Контекст
-        
+
     Returns:
         int: Следующее состояние диалога
     """
@@ -88,8 +90,10 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         user_id = update.effective_user.id
         if user_id in user_data:
             del user_data[user_id]
-        
-        await update.message.reply_text("Operation canceled. Send a new invoice photo when ready.")
+
+        await update.message.reply_text(
+            "Operation canceled. Send a new invoice photo when ready."
+        )
         return WAIT_PHOTO
     except Exception as e:
         log_error(f"Error in cancel command: {e}", exc_info=True)
