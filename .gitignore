@@ -1,0 +1,13 @@
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+venv/
+# logs & learnt data
+logs/
+data/invoices/
+data/learned/
+# OS
+.DS_Store
