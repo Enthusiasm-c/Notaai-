@@ -5,10 +5,7 @@ import logging
 from aiohttp import web
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 
-# Измененный импорт в соответствии с требованиями
-from handlers.command_handlers import start_command, help_command
-from handlers.invoice import handle_invoice
-from handlers.confirmation import handle_callback_query
+from handlers.invoice_handlers import handle_invoice
 
 # Настройка логирования
 logging.basicConfig(
