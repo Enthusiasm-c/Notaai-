@@ -1,315 +1,269 @@
 import datetime
 import logging
-from typing import Dict, List, Tuple, Optional
-import json
+import re
+from typing import Any, Dict
 
-from data.learning import learned_mappings, unit_conversions
-from utils.match import match
+from utils.learning import get_product_id_from_mapping
+from utils.match import get_product_by_id, match
 
-# Получаем логгер
+# Set up logging
 logger = logging.getLogger(__name__)
 
-async def match_invoice_items(invoice_data: Dict) -> Dict:
-    """
-    Сопоставляет товары из накладной с базой данных
-    и добавляет информацию о сопоставлении в данные накладной
-    
-    Args:
-        invoice_data: Словарь с данными накладной
-        
-    Returns:
-        Dict: Словарь с данными накладной с добавленной информацией о сопоставлении
-    """
-    matched_data = invoice_data.copy()
-    
-    # Добавляем информацию о сопоставлении для каждой строки
-    if 'lines' in matched_data:
-        for i, line in enumerate(matched_data['lines']):
-            item_name = line.get('name', '')
-            
-            # Сначала проверяем, есть ли сопоставление в обученных данных
-            learned_match = learned_mappings.get(item_name.lower())
-            if learned_match:
-                # Используем сопоставление из обученных данных
-                matched_data['lines'][i]['product_id'] = learned_match['product_id']
-                matched_data['lines'][i]['match_score'] = 1.0  # Идеальное совпадение
-                matched_data['lines'][i]['learned_name'] = learned_match['corrected_name']
-                logger.info(f"Used learned mapping for '{item_name}' -> '{learned_match['corrected_name']}'")
-            else:
-                # Пытаемся сопоставить с базой данных
-                product_id, score = match(item_name)
-                matched_data['lines'][i]['product_id'] = product_id
-                matched_data['lines'][i]['match_score'] = score
-    
-    return matched_data
 
-def apply_unit_conversions(matched_data: Dict) -> List[Dict]:
+def process_invoice_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Применяет конвертации единиц измерения к сопоставленным товарам
-    
-    Args:
-        matched_data: Словарь с данными накладной
-        
-    Returns:
-        List[Dict]: Список примененных конвертаций
-    """
-    conversions_applied = []
-    
-    if 'lines' not in matched_data:
-        return conversions_applied
-    
-    for i, line in enumerate(matched_data['lines']):
-        product_id = line.get('product_id')
-        if not product_id:
-            continue
-        
-        product_name = line.get('name', '')
-        qty = line.get('qty')
-        unit = line.get('unit', '')
-        
-        if not qty or not unit:
-            continue
-        
-        # Проверяем, есть ли конвертация для этого товара и единицы измерения
-        key = (product_id, unit.lower())
-        if key in unit_conversions:
-            conversion = unit_conversions[key]
-            
-            # Обновляем строку с конвертированными значениями
-            matched_data['lines'][i]['original_qty'] = qty
-            matched_data['lines'][i]['original_unit'] = unit
-            matched_data['lines'][i]['qty'] = qty * conversion['conversion_factor']
-            matched_data['lines'][i]['unit'] = conversion['target_unit']
-            matched_data['lines'][i]['conversion_applied'] = True
-            
-            # Добавляем в список примененных конвертаций
-            conversions_applied.append({
-                'line_index': i,
-                'product_name': product_name,
-                'product_id': product_id,
-                'original_qty': qty,
-                'original_unit': unit,
-                'converted_qty': qty * conversion['conversion_factor'],
-                'converted_unit': conversion['target_unit'],
-                'conversion_factor': conversion['conversion_factor']
-            })
-    
-    return conversions_applied
+    Process raw OCR data into structured invoice data
 
-def format_invoice_data(data: Dict) -> str:
-    """
-    Форматирует данные накладной для отображения пользователю
-    
     Args:
-        data: Словарь с данными накладной и сопоставлений
-        
-    Returns:
-        str: Отформатированный текст для отображения
-    """
-    invoice_data = data['invoice_data']
-    matched_data = data['matched_data']
-    conversions_applied = data.get('conversions_applied', [])
-    
-    # Подсчитываем количество сопоставленных товаров
-    total_items = len(matched_data.get('lines', []))
-    matched_items = sum(1 for line in matched_data.get('lines', []) if line.get('product_id') is not None)
-    unmatched_items = total_items - matched_items
-    
-    result = []
-    result.append(f"📑 Invoice from supplier: {invoice_data.get('supplier', 'Not specified')}")
-    result.append(f"📆 Date: {invoice_data.get('date', 'Not specified')}\n")
-    
-    result.append(f"📊 General information:")
-    result.append(f"- Total items in invoice: {total_items}")
-    result.append(f"- Automatically matched: {matched_items}")
-    result.append(f"- Need verification: {unmatched_items}")
-    
-    # Показываем информацию о конвертациях единиц измерения
-    if conversions_applied:
-        result.append("\n🔄 Unit conversions applied:")
-        for conversion in conversions_applied:
-            result.append(
-                f"- {conversion['product_name']}: "
-                f"{conversion['original_qty']} {conversion['original_unit']} → "
-                f"{conversion['converted_qty']:.2f} {conversion['converted_unit']} "
-                f"(factor: {conversion['conversion_factor']})"
-            )
-    
-    # Если есть неопознанные товары, показываем их подробно
-    if unmatched_items > 0:
-        result.append("\n❓ Unrecognized items:")
-        for i, line in enumerate(matched_data.get('lines', [])):
-            if line.get('product_id') is None:
-                line_num = line.get('line', i+1)
-                name = line.get('name', 'Unknown item')
-                qty = line.get('qty', 0)
-                unit = line.get('unit', '')
-                price = line.get('price', 0)
-                
-                result.append(f"❓ {line_num}. {name}: {qty} {unit}, {price} IDR")
-    
-    # Показываем сопоставленные товары с обученными сопоставлениями
-    learned_items = [line for line in matched_data.get('lines', []) 
-                    if line.get('product_id') is not None and 'learned_name' in line]
-    
-    if learned_items:
-        result.append("\n✅ Items matched from previous corrections:")
-        for line in learned_items:
-            line_num = line.get('line', 0)
-            name = line.get('name', 'Unknown item')
-            learned_name = line.get('learned_name', '')
-            result.append(f"✅ {line_num}. {name} → {learned_name}")
-    
-    # Показываем только количество других распознанных товаров без подробностей
-    auto_matched = matched_items - len(learned_items)
-    if auto_matched > 0:
-        result.append(f"\n✅ {auto_matched} other items successfully matched with the database.")
-    
-    return "\n".join(result)
+        raw_data: Raw data from OCR
 
-def format_final_invoice(data: Dict) -> str:
-    """
-    Форматирует итоговую накладную для предварительного просмотра перед отправкой
-    
-    Args:
-        data: Словарь с данными накладной
-        
     Returns:
-        str: Отформатированный текст для отображения
+        dict: Processed invoice data
     """
-    invoice_data = data['invoice_data']
-    matched_data = data['matched_data']
-    
-    result = []
-    result.append(f"📋 FINAL INVOICE PREVIEW")
-    result.append(f"📑 Supplier: {invoice_data.get('supplier', 'Not specified')}")
-    result.append(f"📆 Date: {invoice_data.get('date', 'Not specified')}\n")
-    
-    # Подсчитываем общую сумму
-    total_sum = 0
-    
-    result.append(f"📊 ITEMS:")
-    result.append(f"{'#':<4} {'Item Name':<30} {'Qty':<10} {'Unit':<8} {'Price':<12} {'Total':<12}")
-    result.append("-" * 80)
-    
-    for i, line in enumerate(matched_data.get('lines', [])):
-        line_num = line.get('line', i+1)
-        name = line.get('name', 'Unknown item')
-        
-        # Используем конвертированные значения, если они есть
-        qty = line.get('qty', 0)
-        unit = line.get('unit', '')
-        price = line.get('price', 0)
-        
-        # Если применена конвертация, показываем оригинальные значения в скобках
-        qty_display = f"{qty}"
-        if 'original_qty' in line:
-            qty_display = f"{qty:.2f} ({line['original_qty']} {line['original_unit']})"
-        
-        # Если есть обученное сопоставление, показываем его
-        name_display = name
-        if 'learned_name' in line:
-            name_display = f"{name} → {line['learned_name']}"
-        
-        # Расчет общей суммы для строки
-        line_total = qty * price if qty is not None and price is not None else 0
-        total_sum += line_total
-        
-        # Ограничиваем длину названия для форматирования
-        if len(name_display) > 27:
-            name_display = name_display[:24] + "..."
-        
-        result.append(f"{line_num:<4} {name_display:<30} {qty_display:<10} {unit:<8} {price:<12} {line_total:<12}")
-    
-    result.append("-" * 80)
-    result.append(f"{'TOTAL:':<45} {'':<8} {'':<12} {total_sum:<12} IDR")
-    
-    result.append("\n✅ This data will be sent to Syrve. Please review carefully.")
-    
-    return "\n".join(result)
-
-def prepare_invoice_data_for_syrve(matched_data: Dict) -> Dict:
-    """
-    Подготавливает данные накладной для отправки в Syrve API
-    
-    Args:
-        matched_data: Словарь с данными накладной
-        
-    Returns:
-        Dict: Данные для отправки в API
-    """
-    # Создаем структуру данных для отправки
-    invoice_data = {
-        "number": f"INV-{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}",
-        "date": matched_data.get('date', datetime.datetime.now().strftime("%d.%m.%Y")),
-        "supplier_id": matched_data.get('supplier_id', "7"),  # Значение по умолчанию
-        "items": []
+    # Initialize processed data
+    processed_data = {
+        "date": raw_data.get("date", datetime.datetime.now().strftime("%Y-%m-%d")),
+        "vendor_name": raw_data.get("vendor_name", "Unknown Vendor"),
+        "total_amount": raw_data.get("total_amount", 0),
+        "items": [],
     }
-    
-    # Добавляем товары
-    for line in matched_data.get('lines', []):
-        if line.get('product_id'):
-            product_id = line.get('product_id')
-            qty = line.get('qty', 0)
-            price = line.get('price', 0)
-            
-            # Расчет суммы
-            total = qty * price
-            
-            # Добавляем товар в список
-            invoice_data["items"].append({
-                "product_id": product_id,
-                "amount": float(qty),
-                "price": float(price),
-                "total": float(total)
-            })
-    
-    return invoice_data
 
-async def check_product_exists(item_name: str) -> Tuple[bool, Optional[str]]:
-    """
-    Проверяет, существует ли товар с заданным названием в базе данных
-    
-    Args:
-        item_name: Название товара
-        
-    Returns:
-        Tuple[bool, Optional[str]]: (существует, ID_товара)
-    """
-    # В MVP это простое сопоставление
-    # В реальной реализации будет запрос к базе данных
-    
-    # Проверяем на точное совпадение
-    product_id, score = match(item_name, threshold=0.95)  # Высокий порог для "точного" совпадения
-    
-    if product_id:
-        return True, product_id
-    
-    # Если нет точного совпадения, ищем близкие совпадения
-    product_id, score = match(item_name, threshold=0.7)
-    
-    if product_id:
-        return True, product_id
-    
-    # Совпадений не найдено
-    return False, None
+    # Clean and normalize date
+    processed_data["date"] = normalize_date(processed_data["date"])
 
-def save_invoice_data(user_id, matched_data):
+    # Clean vendor name
+    processed_data["vendor_name"] = clean_vendor_name(processed_data["vendor_name"])
+
+    # Normalize total amount
+    processed_data["total_amount"] = normalize_amount(processed_data["total_amount"])
+
+    # Process items
+    raw_items = raw_data.get("items", [])
+    processed_items = []
+
+    for item in raw_items:
+        processed_item = process_item(item)
+        if processed_item:
+            processed_items.append(processed_item)
+
+    processed_data["items"] = processed_items
+
+    logger.info(
+        f"Processed invoice with {len(processed_items)} items from {processed_data['vendor_name']}"
+    )
+    return processed_data
+
+
+def normalize_date(date_str: str) -> str:
     """
-    Сохраняет данные накладной в JSON-файл
-    
+    Normalize date strings to YYYY-MM-DD format
+
     Args:
-        user_id: ID пользователя
-        matched_data: Данные накладной
-        
+        date_str: Date string in various formats
+
     Returns:
-        str: Путь к сохраненному файлу
+        str: Normalized date string
     """
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"data/invoices/invoice_{user_id}_{timestamp}.json"
-    
-    with open(filename, 'w', encoding='utf-8') as f:
-        json.dump(matched_data, f, ensure_ascii=False, indent=2)
-    
-    logger.info(f"Saved invoice data to {filename}")
-    return filename
+    if not date_str:
+        return datetime.datetime.now().strftime("%Y-%m-%d")
+
+    # Try different date formats
+    formats = [
+        "%d.%m.%Y",  # 31.12.2023
+        "%d/%m/%Y",  # 31/12/2023
+        "%Y-%m-%d",  # 2023-12-31
+        "%d.%m.%y",  # 31.12.23
+        "%d/%m/%y",  # 31/12/23
+        "%B %d, %Y",  # December 31, 2023
+        "%d %B %Y",  # 31 December 2023
+    ]
+
+    for fmt in formats:
+        try:
+            # Parse the date
+            parsed_date = datetime.datetime.strptime(date_str, fmt)
+            # Return in standard format
+            return parsed_date.strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+
+    # If all formats fail, try to extract date with regex
+    # Look for patterns like DD.MM.YYYY or DD/MM/YYYY
+    date_regex = r"(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})"
+    match = re.search(date_regex, date_str)
+    if match:
+        day, month, year = match.groups()
+
+        # Handle 2-digit years
+        if len(year) == 2:
+            # Assume 20xx for years less than 50, 19xx otherwise
+            year = f"20{year}" if int(year) < 50 else f"19{year}"
+
+        try:
+            # Create date object
+            parsed_date = datetime.datetime(int(year), int(month), int(day))
+            return parsed_date.strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+
+    # If all else fails, return today's date
+    logger.warning("Could not parse date: {}, using today's date".format(date_str))
+    return datetime.datetime.now().strftime("%Y-%m-%d")
+
+
+def clean_vendor_name(vendor_name: str) -> str:
+    """
+    Clean and normalize vendor name
+
+    Args:
+        vendor_name: Raw vendor name
+
+    Returns:
+        str: Cleaned vendor name
+    """
+    if not vendor_name:
+        return "Unknown Vendor"
+
+    # Remove multiple spaces
+    vendor_name = re.sub(r"\s+", " ", vendor_name.strip())
+
+    # Remove common prefixes like "ООО", "ИП", etc.
+    vendor_name = re.sub(r"^(ООО|ИП|АО|ЗАО|ОАО)\s+", "", vendor_name)
+
+    # Remove quotes
+    vendor_name = vendor_name.replace('"', "").replace("'", "")
+
+    return vendor_name.strip()
+
+
+def normalize_amount(amount) -> float:
+    """
+    Normalize amount to float
+
+    Args:
+        amount: Amount in various formats
+
+    Returns:
+        float: Normalized amount
+    """
+    if isinstance(amount, (int, float)):
+        return float(amount)
+
+    if not amount:
+        return 0.0
+
+    # If it's a string, clean it
+    if isinstance(amount, str):
+        # Remove currency symbols, spaces, etc.
+        amount = re.sub(r"[^\d.,]", "", amount)
+
+        # Replace comma with dot for decimal point
+        amount = amount.replace(",", ".")
+
+        # Handle multiple dots (e.g. 1.234.56 → 1234.56)
+        if amount.count(".") > 1:
+            # Keep last dot as decimal point, remove others
+            parts = amount.split(".")
+            decimal_part = parts.pop()
+            whole_part = "".join(parts)
+            amount = f"{whole_part}.{decimal_part}"
+
+    try:
+        return float(amount)
+    except (ValueError, TypeError):
+        logger.warning("Could not convert amount to float: {}".format(amount))
+        return 0.0
+
+
+def process_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Process an invoice item
+
+    Args:
+        item: Raw item data
+
+    Returns:
+        dict: Processed item data
+    """
+    # Skip empty items
+    if not item or not item.get("name"):
+        return None
+
+    # Initialize processed item
+    processed_item = {
+        "name": item.get("name", "").strip(),
+        "quantity": normalize_amount(item.get("quantity", 1)),
+        "price": normalize_amount(item.get("price", 0)),
+    }
+
+    # Ensure minimum quantity is 1
+    if processed_item["quantity"] <= 0:
+        processed_item["quantity"] = 1
+
+    # Try to match with product database
+    product_id = get_product_id_from_mapping(processed_item["name"])
+
+    if product_id:
+        # We have a learned mapping
+        product = get_product_by_id(product_id)
+        if product:
+            processed_item["product_id"] = product_id
+            processed_item["product_name"] = product.get("name")
+    else:
+        # Try fuzzy matching
+        product_id, score = match(processed_item["name"])
+        if product_id and score > 0.7:
+            product = get_product_by_id(product_id)
+            if product:
+                processed_item["product_id"] = product_id
+                processed_item["product_name"] = product.get("name")
+                processed_item["match_score"] = score
+
+    return processed_item
+
+
+def format_invoice_for_display(invoice_data: Dict[str, Any]) -> str:
+    """
+    Format invoice data for display in Telegram message
+
+    Args:
+        invoice_data: Processed invoice data
+
+    Returns:
+        str: Formatted invoice data for display
+    """
+    # Format date
+    try:
+        date_obj = datetime.datetime.strptime(invoice_data.get("date", ""), "%Y-%m-%d")
+        formatted_date = date_obj.strftime("%d.%m.%Y")
+    except ValueError:
+        formatted_date = invoice_data.get("date", "Дата не указана")
+
+    # Format vendor and total
+    vendor_name = invoice_data.get("vendor_name", "Не указан")
+    total_amount = invoice_data.get("total_amount", 0)
+
+    # Start building the message
+    message = (
+        "📄 <b>Данные накладной</b>\n\n"
+        f"<b>Поставщик:</b> {vendor_name}\n"
+        f"<b>Дата:</b> {formatted_date}\n"
+        f"<b>Сумма:</b> {total_amount:.2f} руб.\n\n"
+        "<b>Товары:</b>\n"
+    )
+
+    # Add items
+    for i, item in enumerate(invoice_data.get("items", []), 1):
+        name = item.get("name", "Без названия")
+        quantity = item.get("quantity", 0)
+        price = item.get("price", 0)
+        total = quantity * price
+
+        # Check if matched with product
+        if "product_name" in item:
+            name = f"{name} → <i>{item['product_name']}</i>"
+
+        # Add item line
+        message += f"{i}. {name}\n   {quantity} × {price:.2f} = {total:.2f} руб.\n"
+
+    return message

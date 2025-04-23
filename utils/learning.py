@@ -1,6 +1,6 @@
-import os
 import json
 import logging
+import os
 from typing import Dict, Optional
 
 # Set up logging
@@ -154,8 +154,6 @@ def save_unit_conversion(from_unit: str, to_unit: str, factor: float) -> bool:
     Returns:
         bool: Success status
     """
-    global unit_conversions
-
     try:
         # Load existing conversions
         conversions = load_unit_conversions()
@@ -180,6 +178,7 @@ def save_unit_conversion(from_unit: str, to_unit: str, factor: float) -> bool:
             json.dump(conversions, f, ensure_ascii=False, indent=2)
 
         # Update cache
+        global unit_conversions
         unit_conversions = conversions
 
         logger.info(f"Saved new unit conversion: {from_unit} -> {to_unit} (factor: {factor})")

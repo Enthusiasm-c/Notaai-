@@ -1,0 +1,13 @@
+[tool.black]
+line-length = 100          # ширина, на которую будет форматировать black
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"          # импорты автоматически под стиль black
+
+[tool.flake8]
+max-line-length = 100      # та же ширина, что у black
+extend-ignore ="E203,E501,W503,W293"
+#  E203, W503 – конфликты с black
+#  E501       – длина строки, теперь 100
+#  W293       – пробелы на пустых строках (black их сам чистит)

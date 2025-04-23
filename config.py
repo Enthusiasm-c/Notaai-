@@ -1,62 +1,33 @@
 import os
 import logging
-import datetime
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
 
 # Состояния диалога
-WAIT_PHOTO = 0           # Ожидание фото накладной
-CONFIRMATION = 1         # Ожидание подтверждения
-EDIT_ITEM = 2            # Редактирование неопознанного товара
-ADD_NEW_ITEM = 3         # Добавление нового товара
-SET_CONVERSION = 4       # Настройка конвертации единиц измерения
-EDIT_SPECIFIC_ITEM = 5   # Редактирование конкретной позиции
-FINAL_CONFIRMATION = 6   # Финальное подтверждение перед отправкой
-SELECT_EDIT_ITEM = 7     # Выбор позиции для редактирования
-PREVIOUS_STEP = 8        # Возврат к предыдущему шагу
-CONFIRM_ADD_NEW = 9      # Подтверждение добавления нового товара
+WAIT_PHOTO = 0
+WAIT_CONFIRM = 1
+user_data = {}  # Словарь для хранения данных пользователей: dict[int, dict]
 
-# Пути к файлам данных
-LEARNED_MAPPINGS_FILE = 'data/learned/item_mappings.csv'
-UNIT_CONVERSIONS_FILE = 'data/learned/unit_conversions.csv'
+# Конфигурация бота
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
+if not TELEGRAM_TOKEN:
+    raise ValueError("TELEGRAM_TOKEN environment variable is not set")
 
-# Директории для хранения данных
-DIRECTORIES = [
-    'logs',
-    'logs/errors',
-    'logs/errors/detailed',
-    'logs/images',
-    'logs/error_images',
-    'data/invoices',
-    'data/learned'
-]
+# Конфигурация OpenAI API
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+if not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY environment variable is not set")
 
-def setup_directories():
-    """Создает необходимые директории для работы приложения"""
-    for directory in DIRECTORIES:
-        os.makedirs(directory, exist_ok=True)
+OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4o')
 
-def setup_logging():
-    """Настройка логирования"""
-    # Настройка основного логирования
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler('logs/nota_bot.log'),
-            logging.StreamHandler()
-        ]
-    )
+# Конфигурация Syrve API
+SYRVE_LOGIN = os.environ.get('SYRVE_LOGIN')
+SYRVE_PASSWORD = os.environ.get('SYRVE_PASSWORD')
+SYRVE_BASE_URL = os.environ.get('SYRVE_BASE_URL', 'https://api.syrve.com/api/v2')
 
-    # Создание отдельного логгера для ошибок
-    error_logger = logging.getLogger('error_logger')
-    error_logger.setLevel(logging.ERROR)
-    error_handler = logging.FileHandler('logs/errors/error_log.log')
-    error_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s\n%(pathname)s:%(lineno)d\n%(funcName)s\n\n%(exc_info)s\n\n'))
-    error_logger.addHandler(error_handler)
-    
-    # Получаем основной логгер
-    logger = logging.getLogger(__name__)
-    
-    return logger
-
-# Глобальный словарь для хранения данных накладных пользователей
-user_data = {}
+# Конфигурация Redis
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
