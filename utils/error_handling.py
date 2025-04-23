@@ -2,7 +2,7 @@ import datetime
 import logging
 import os
 import traceback
-from typing import Optional, Union
+from typing import Optional
 
 # Получаем логгеры
 logger = logging.getLogger(__name__)
