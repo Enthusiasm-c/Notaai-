@@ -5,6 +5,8 @@
 import logging
 import os
 import uuid
+from pathlib import Path
+from typing import Union
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
@@ -17,6 +19,9 @@ from utils.invoice_processing import apply_unit_conversions, match_invoice_items
 
 # Получаем логгер
 logger = logging.getLogger(__name__)
+
+# Директория для временных файлов
+TMP_DIR = "/tmp/notaai"
 
 
 async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -44,11 +49,12 @@ async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         photo_file = await photo.get_file()
         
         # Создаем директорию для временных файлов, если её нет
-        os.makedirs("tmp", exist_ok=True)
+        os.makedirs(TMP_DIR, exist_ok=True)
         
         # Генерируем имя файла и сохраняем фото
-        photo_path = f"tmp/invoice_{update.effective_chat.id}_{uuid.uuid4()}.jpg"
-        await photo_file.download_to_drive(photo_path)
+        file_unique_id = f"invoice_{update.effective_chat.id}_{uuid.uuid4()}"
+        photo_path = f"{TMP_DIR}/{file_unique_id}.jpg"
+        await photo_file.download_to_drive(custom_path=photo_path)
         
         logger.info("Saved photo to %s", photo_path)
         
