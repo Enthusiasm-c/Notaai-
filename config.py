@@ -8,8 +8,9 @@ logging.basicConfig(
 )
 
 # Состояния диалога
-WAIT_PHOTO = 0
-WAIT_CONFIRM = 1
+WAIT_PHOTO     = 0   # бот ждёт фото накладной
+CONFIRMATION   = 1   # ждём подтверждения от пользователя
+WAIT_SUPPLIER  = 2   # (пример) ждём выбора поставщика
 user_data = {}  # Словарь для хранения данных пользователей: dict[int, dict]
 
 # Конфигурация бота
