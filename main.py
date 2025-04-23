@@ -23,6 +23,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 async def setup_bot():
     """Initialize and set up Telegram bot with handlers"""
     # Get bot token from environment variable
@@ -39,49 +40,47 @@ async def setup_bot():
     application.add_handler(CommandHandler("help", help_command))
 
     # Add invoice handler for photos and documents
-    application.add_handler(
-        MessageHandler(filters.PHOTO | filters.Document.PDF, handle_invoice)
-    )
+    application.add_handler(MessageHandler(filters.PHOTO | filters.Document.PDF, handle_invoice))
 
     # Add callback query handler for confirmation buttons
     application.add_handler(CallbackQueryHandler(handle_callback_query))
 
     return application
 
+
 async def ping_handler(request):
     """Health check endpoint that returns a simple status"""
-    return web.Response(
-        text=json.dumps({"status": "ok"}),
-        content_type="application/json"
-    )
+    return web.Response(text=json.dumps({"status": "ok"}), content_type="application/json")
+
 
 async def start_web_server():
     """Start a simple web server for health checks"""
     app = web.Application()
-    app.add_routes([web.get('/ping', ping_handler)])
-    
-    port = int(os.environ.get('PORT', 8080))
+    app.add_routes([web.get("/ping", ping_handler)])
+
+    port = int(os.environ.get("PORT", 8080))
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
+    site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
-    
+
     logger.info(f"Health check endpoint running on port {port}")
+
 
 async def main():
     """Main function to run both the bot and health check server"""
     # Start health check web server
     await start_web_server()
-    
+
     # Set up and start the bot
     application = await setup_bot()
     await application.initialize()
     await application.start()
     await application.run_polling()
 
+
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        logger.info("Bot stopped!")y
-
+        logger.info("Bot stopped!")

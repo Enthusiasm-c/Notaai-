@@ -166,7 +166,6 @@ def save_product(product_id: str, product_name: str, category: str = "") -> bool
             writer.writerow([product_id, product_name, category])
 
         # Добавляем товар в кэш
-        global _products_cache
         if _products_cache is not None:
             _products_cache.append({"id": product_id, "name": product_name, "category": category})
 
