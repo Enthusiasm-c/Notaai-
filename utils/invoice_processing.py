@@ -151,7 +151,7 @@ def format_final_invoice(user_data: Dict) -> str:
     # Добавляем таблицу товаров
     message += "*ТОВАРЫ:*\n"
     message += "```\n"
-    message += f"{'#':<3} {'Наименование':<30} {'Кол-во':<10} {'Цена':<10} {'Сумма':<10}\n"
+    message += "# Наименование                   Кол-во     Цена      Сумма     \n"
     message += "-" * 70 + "\n"
     
     for i, line in enumerate(matched_data.get("lines", [])):
@@ -169,7 +169,7 @@ def format_final_invoice(user_data: Dict) -> str:
         message += line_str
     
     message += "-" * 70 + "\n"
-    message += f"{'ИТОГО:':<45} {total:<10.2f}\n"
+    message += "ИТОГО:                                            {:.2f}\n".format(total)
     message += "```\n\n"
     
     # Добавляем информацию о действиях
