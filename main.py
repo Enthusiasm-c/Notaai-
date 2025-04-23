@@ -1,9 +1,8 @@
 """
-main.py — точка входа Nota AI-бота.
+main.py — точка входа Nota AI.
 
-* Использует python-telegram-bot v20+
-* Запускает polling блокирующим вызовом run_polling(close_loop=False)
-  — избегаем ошибки «Cannot close a running event loop».
+* python-telegram-bot v20+
+* run_polling(close_loop=False) — исключаем RuntimeError
 """
 
 from __future__ import annotations
@@ -19,12 +18,12 @@ from telegram.ext import (
 )
 
 from handlers.command_handlers import start_command, help_command
-from handlers.invoice_handlers import handle_invoice  # ваш обработчик фото
+from handlers.invoice_handlers import handle_invoice
 
-# ──────────────────────────── конфигурация ──────────────────────────────
+# ───────────────────────────  конфиг  ──────────────────────────────
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 if not BOT_TOKEN:
-    raise RuntimeError("Проверьте, что переменная TELEGRAM_BOT_TOKEN задана в .env")
+    raise RuntimeError("TELEGRAM_BOT_TOKEN not set in environment / .env")
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -34,24 +33,21 @@ logger = logging.getLogger(__name__)
 
 
 def build_app() -> Application:
-    """Создаём и конфигурируем экземпляр Application."""
-    application = Application.builder().token(BOT_TOKEN).build()
+    """Создаём и настраиваем Application."""
+    app = Application.builder().token(BOT_TOKEN).build()
 
-    # команды
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_invoice))
 
-    # фото накладной
-    application.add_handler(MessageHandler(filters.PHOTO, handle_invoice))
-
-    return application
+    return app
 
 
 def main() -> None:
-    """Точка входа: конфигурируем и запускаем polling."""
+    """Запуск бота (polling + health-check)."""
     application = build_app()
     logger.info("Starting bot…")
-    application.run_polling(close_loop=False)  # ← ключевой параметр
+    application.run_polling(close_loop=False)   # ← ключ!
     logger.info("Bot stopped!")
 
 
