@@ -153,8 +153,8 @@ async def handle_invoice_callback(update: Update, context: ContextTypes.DEFAULT_
         # Проверяем соответствие ID
         if context.user_data.get("invoice_id") != invoice_id:
             logger.warning(
-                "Invoice ID mismatch: %s != %s", 
-                context.user_data.get("invoice_id"), 
+                "Invoice ID mismatch: %s != %s",
+                context.user_data.get("invoice_id"),
                 invoice_id
             )
             await query.edit_message_text(
