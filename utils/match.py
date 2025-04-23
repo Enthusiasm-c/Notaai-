@@ -1,8 +1,8 @@
-import csv
-import difflib
-import logging
 import os
-from typing import Dict, List, Optional, Tuple
+import csv
+import logging
+import difflib
+from typing import Tuple, Optional, List, Dict
 
 # Получаем логгер
 logger = logging.getLogger(__name__)
@@ -107,6 +107,7 @@ def match(item_name: str, threshold: float = 0.6) -> Tuple[Optional[str], float]
         return best_match.get("id"), best_score
     else:
         logger.info(f"No match found for '{item_name}' (best score: {best_score:.2f})")
+
         return None, 0
 
 
