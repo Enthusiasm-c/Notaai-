@@ -12,13 +12,15 @@ import os
 
 from telegram.ext import (
     Application,
+    CallbackQueryHandler,
     CommandHandler,
     MessageHandler,
     filters,
 )
 
+from config import CONFIRMATION
 from handlers.command_handlers import start_command, help_command
-from handlers.invoice_handlers import handle_invoice
+from handlers.invoice_handlers import handle_invoice, handle_invoice_callback
 
 # ───────────────────────────  конфиг  ──────────────────────────────
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -39,6 +41,9 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(MessageHandler(filters.PHOTO, handle_invoice))
+    
+    # Добавляем обработчик для callback кнопок
+    app.add_handler(CallbackQueryHandler(handle_invoice_callback, pattern="^(confirm_invoice:|edit_items:)"))
 
     return app
 
