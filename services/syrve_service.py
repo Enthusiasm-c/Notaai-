@@ -1,3 +1,7 @@
+"""
+Service for interacting with Syrve ERP API
+"""
+
 import datetime
 import logging
 from typing import Any, Dict, Optional
@@ -149,3 +153,9 @@ class SyrveService:
         }
 
         return syrve_invoice
+
+
+# --- Proxy for backward-compatibility ------------------------------------
+async def create_invoice(invoice_data: Dict[str, Any]) -> Optional[str]:
+    """Proxy-функция, вызывает SyrveService.create_invoice()."""
+    return await SyrveService().create_invoice(invoice_data)
