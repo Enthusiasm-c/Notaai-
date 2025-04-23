@@ -1,17 +1,11 @@
-version: "3.9"
-
 services:
   bot:
-    image: ghcr.io/enthusiasm-c/notaai:sha-db310233c93d116557d3a51ba4982990bd531124
-    env_file:
-      - .env
-    ports:
-      - "8080:8080"     # health-check endpoint
+    image: ghcr.io/enthusiasm-c/notaai:sha-52da199c21c158cdee11633111fecc00218482bd
+    env_file: .env
     depends_on:
       - redis
-    restart: unless-stopped
+    ports:
+      - "8080:8080"
 
   redis:
     image: redis:7-alpine
-    restart: unless-stopped
-
