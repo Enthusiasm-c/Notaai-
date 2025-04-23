@@ -169,7 +169,7 @@ def format_final_invoice(user_data: Dict) -> str:
         message += line_str
     
     message += "-" * 70 + "\n"
-    message += f"{'ИТОГО:':<45} {total:<10.2f}\n"
+    message += "ИТОГО:                                            " + f"{total:<10.2f}\n"
     message += "```\n\n"
     
     # Добавляем информацию о действиях
