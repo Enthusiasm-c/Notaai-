@@ -120,6 +120,7 @@ def load_unit_conversions() -> Dict[str, Dict[str, float]]:
         dict: Unit conversions
     """
     # If cache is already populated, return it
+    global unit_conversions
     if unit_conversions:
         return unit_conversions
 
@@ -133,7 +134,6 @@ def load_unit_conversions() -> Dict[str, Dict[str, float]]:
             loaded_conversions = json.load(f)
 
         # Store in cache
-        global unit_conversions
         unit_conversions = loaded_conversions
         logger.info(f"Loaded unit conversions for {len(unit_conversions)} units")
         return unit_conversions

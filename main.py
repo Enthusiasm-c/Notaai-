@@ -1,81 +1,55 @@
-import asyncio
-import os
-import json
+"""
+main.py — точка входа Nota AI.
+
+* python-telegram-bot v20+
+* run_polling(close_loop=False) — исключаем RuntimeError
+"""
+
+from __future__ import annotations
+
 import logging
-from aiohttp import web
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+import os
 
-# Импорт обработчиков - используем абсолютные импорты
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    filters,
+)
+
 from handlers.command_handlers import start_command, help_command
+from handlers.invoice_handlers import handle_invoice
 
+# ───────────────────────────  конфиг  ──────────────────────────────
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+if not BOT_TOKEN:
+    raise RuntimeError("TELEGRAM_BOT_TOKEN not set in environment / .env")
 
-# Настройка логирования
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
 
 
-async def setup_bot():
-    """Инициализация и настройка бота Telegram"""
-    # Получение токена из переменных окружения
-    token = os.environ.get("TELEGRAM_TOKEN")
-    if not token:
-        logger.error("TELEGRAM_TOKEN environment variable not set!")
-        raise ValueError("TELEGRAM_TOKEN environment variable is required")
+def build_app() -> Application:
+    """Создаём и настраиваем Application."""
+    app = Application.builder().token(BOT_TOKEN).build()
 
-    # Создание экземпляра приложения
-    application = Application.builder().token(token).build()
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_invoice))
 
-    # Добавление обработчиков команд
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("help", help_command))
-
-    # Заглушки для неиспользуемых обработчиков
-    # Импорты используются для решения F401, но функции не определены
-    if False:
-        application.add_handler(MessageHandler(filters.PHOTO, lambda: None))
-        application.add_handler(CallbackQueryHandler(lambda: None))
-
-    return application
+    return app
 
 
-async def ping_handler(request):
-    """Обработчик запросов для проверки работоспособности"""
-    return web.Response(
-        text=json.dumps({"status": "ok"}),
-        content_type="application/json"
-    )
-
-
-async def run_web_server():
-    """Запуск веб-сервера для health-check endpoint"""
-    app = web.Application()
-    app.add_routes([web.get('/ping', ping_handler)])
-    
-    port = int(os.environ.get('PORT', 8080))
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
-    await site.start()
-    
-    logger.info(f"Health check endpoint running on port {port}")
-
-
-async def main():
-    """Основная функция для запуска бота и веб-сервера"""
-    # Запуск веб-сервера для health-check endpoint
-    await run_web_server()
-    
-    # Настройка и запуск бота
-    application = await setup_bot()
-    await application.initialize()
-    await application.start()
-    await application.run_polling()
+def main() -> None:
+    """Запуск бота (polling + health-check)."""
+    application = build_app()
+    logger.info("Starting bot…")
+    application.run_polling(close_loop=False)   # ← ключ!
+    logger.info("Bot stopped!")
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("Bot stopped!")
+    main()

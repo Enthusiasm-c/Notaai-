@@ -3,14 +3,12 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 
-# /start
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Привет! Я Nota AI. Пришлите фото накладной — распознаю и отправлю в Syrve."
     )
 
 
-# /help
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "/start – начать работу\n"

@@ -1,33 +1,47 @@
+"""
+config.py
+Константы и глобальные данные для Nota AI-бота.
+"""
+
+from __future__ import annotations
+
 import os
-import logging
+from pathlib import Path
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-)
+# ──────────────────────────
+# Состояния диалога бота
+# ──────────────────────────
+WAIT_PHOTO = 0  # ждём фото накладной
+CONFIRMATION = 1  # ждём подтверждения «всё верно?»
+WAIT_SUPPLIER = 2  # пример: выбор поставщика
+WAIT_CORRECTION = 3  # пример: исправление позиций
 
-# Состояния диалога
-WAIT_PHOTO = 0
-WAIT_CONFIRM = 1
-user_data = {}  # Словарь для хранения данных пользователей: dict[int, dict]
+# Сессии: user_id → произвольные данные
+user_data: dict[int, dict] = {}
 
-# Конфигурация бота
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
-if not TELEGRAM_TOKEN:
-    raise ValueError("TELEGRAM_TOKEN environment variable is not set")
+# ──────────────────────────
+# Пути к данным
+# ──────────────────────────
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+PRODUCTS_CSV = DATA_DIR / "base_products.csv"
+SUPPLIERS_CSV = DATA_DIR / "base_suppliers.csv"
+LEARNED_PRODUCTS = DATA_DIR / "learned_products.csv"
+LEARNED_SUPPLIERS = DATA_DIR / "learned_suppliers.csv"
 
-# Конфигурация OpenAI API
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
-if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY environment variable is not set")
+# ──────────────────────────
+# Syrve (iiko) API
+# ──────────────────────────
+SYRVE_SERVER_URL = os.getenv("SYRVE_SERVER_URL", "https://example.syrve.online")
+SYRVE_LOGIN = os.getenv("SYRVE_LOGIN", "demo")
+SYRVE_PASSWORD = os.getenv("SYRVE_PASSWORD", "demo")
+DEFAULT_STORE_ID = os.getenv("DEFAULT_STORE_ID", "00000000-0000-0000-0000-000000000000")
 
-OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4o')
+# ──────────────────────────
+# OpenAI / Telegram
+# ──────────────────────────
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
-# Конфигурация Syrve API
-SYRVE_LOGIN = os.environ.get('SYRVE_LOGIN')
-SYRVE_PASSWORD = os.environ.get('SYRVE_PASSWORD')
-SYRVE_BASE_URL = os.environ.get('SYRVE_BASE_URL', 'https://api.syrve.com/api/v2')
-
-# Конфигурация Redis
-REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+# хранить временные фото (сек)
+TMP_PHOTO_TTL = int(os.getenv("TMP_PHOTO_TTL", "3600"))
