@@ -18,7 +18,6 @@ from telegram.ext import (
     filters,
 )
 
-from config import CONFIRMATION
 from handlers.command_handlers import start_command, help_command
 from handlers.invoice_handlers import handle_invoice, handle_invoice_callback
 
