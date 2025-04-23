@@ -9,13 +9,11 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from handlers.command_handlers import start_command, help_command
 
 
-
 # Настройка логирования
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
-
 
 
 async def setup_bot():
@@ -42,14 +40,12 @@ async def setup_bot():
     return application
 
 
-
 async def ping_handler(request):
     """Обработчик запросов для проверки работоспособности"""
     return web.Response(
         text=json.dumps({"status": "ok"}),
         content_type="application/json"
     )
-
 
 
 async def run_web_server():
@@ -66,7 +62,6 @@ async def run_web_server():
     logger.info(f"Health check endpoint running on port {port}")
 
 
-
 async def main():
     """Основная функция для запуска бота и веб-сервера"""
     # Запуск веб-сервера для health-check endpoint
@@ -77,7 +72,6 @@ async def main():
     await application.initialize()
     await application.start()
     await application.run_polling()
-
 
 
 if __name__ == "__main__":
