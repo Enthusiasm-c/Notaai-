@@ -3,13 +3,10 @@ import os
 import json
 import logging
 from aiohttp import web
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler
 
 # Импорт обработчиков
 from handlers.command_handlers import start_command, help_command
-# Следующие импорты исключены, так как у нас нет этих модулей в данной задаче
-# from handlers.invoice import handle_invoice
-# from handlers.confirmation import handle_callback_query
 
 
 # Настройка логирования
@@ -33,12 +30,6 @@ async def setup_bot():
     # Добавление обработчиков команд
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
-
-    # Следующие обработчики исключены, так как у нас нет этих функций в данной задаче
-    # application.add_handler(
-    #    MessageHandler(filters.PHOTO | filters.Document.PDF, handle_invoice)
-    # )
-    # application.add_handler(CallbackQueryHandler(handle_callback_query))
 
     return application
 
