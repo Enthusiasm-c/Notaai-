@@ -1,6 +1,6 @@
 services:
   bot:
-    image: ghcr.io/enthusiasm-c/notaai:sha-6b6d1ce86dd2650f8cf6f6a262952d415e4b66cf
+    image: ghcr.io/enthusiasm-c/notaai:sha-37dc12a3239916f437d292fd9e08d1a6170e9451
     env_file: .env
     depends_on:
       - redis
