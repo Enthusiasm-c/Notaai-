@@ -1,6 +1,7 @@
 services:
   bot:
-    image: ghcr.io/enthusiasm-c/notaai:develop      # ← только это
+
+    image: ghcr.io/enthusiasm-c/notaai:develop
     env_file: .env
     depends_on:
       - redis
