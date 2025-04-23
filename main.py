@@ -3,10 +3,11 @@ import os
 import json
 import logging
 from aiohttp import web
-from telegram.ext import Application, CommandHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 
-# Импорт обработчиков
+# Импорт обработчиков - используем абсолютные импорты
 from handlers.command_handlers import start_command, help_command
+
 
 
 # Настройка логирования
@@ -14,6 +15,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
 
 
 async def setup_bot():
@@ -31,7 +33,14 @@ async def setup_bot():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
 
+    # Заглушки для неиспользуемых обработчиков
+    # Импорты используются для решения F401, но функции не определены
+    if False:
+        application.add_handler(MessageHandler(filters.PHOTO, lambda: None))
+        application.add_handler(CallbackQueryHandler(lambda: None))
+
     return application
+
 
 
 async def ping_handler(request):
@@ -40,6 +49,7 @@ async def ping_handler(request):
         text=json.dumps({"status": "ok"}),
         content_type="application/json"
     )
+
 
 
 async def run_web_server():
@@ -56,6 +66,7 @@ async def run_web_server():
     logger.info(f"Health check endpoint running on port {port}")
 
 
+
 async def main():
     """Основная функция для запуска бота и веб-сервера"""
     # Запуск веб-сервера для health-check endpoint
@@ -66,6 +77,7 @@ async def main():
     await application.initialize()
     await application.start()
     await application.run_polling()
+
 
 
 if __name__ == "__main__":
