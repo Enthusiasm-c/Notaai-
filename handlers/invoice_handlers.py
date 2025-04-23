@@ -5,7 +5,6 @@
 import logging
 import os
 import uuid
-from typing import Optional
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
