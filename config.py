@@ -1,6 +1,13 @@
 import logging
 import os
 
+# conversation states
+WAIT_PHOTO = 0          # бот ждёт фото накладной
+WAIT_CONFIRM = 1        # бот ждёт подтверждения
+
+# простое хранилище данных пользователя (в памяти процесса)
+user_data: dict[int, dict] = {}
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
