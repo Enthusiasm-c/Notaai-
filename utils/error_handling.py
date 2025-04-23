@@ -2,8 +2,7 @@ import datetime
 import logging
 import os
 import traceback
-from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 # Получаем логгеры
 logger = logging.getLogger(__name__)
@@ -34,7 +33,7 @@ def log_error(message, exc_info=None):
             traceback.print_exception(type(exc_info), exc_info, exc_info.__traceback__, file=f)
 
 
-def save_error_image(user_id: int, photo_bytes: bytes) -> Union[str, None]:
+def save_error_image(user_id: int, photo_bytes: bytes) -> Optional[str]:
     """
     Сохраняет изображение, вызвавшее ошибку, для дальнейшего анализа
 
