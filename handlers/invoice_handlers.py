@@ -5,8 +5,6 @@
 import logging
 import os
 import uuid
-from pathlib import Path
-from typing import Union
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
