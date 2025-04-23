@@ -2,7 +2,6 @@
 Тесты для обработчика фотографий накладных.
 """
 
-import os
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -72,7 +71,7 @@ def mock_callback_update(mock_context):
     query = MagicMock(spec=CallbackQuery)
     query.message = message
     query.from_user = user
-    query.data = f"confirm_invoice:test_invoice_id"
+    query.data = "confirm_invoice:test_invoice_id"
     query.answer = AsyncMock()
     query.edit_message_text = AsyncMock()
     
