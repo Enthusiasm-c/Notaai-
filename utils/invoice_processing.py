@@ -67,7 +67,7 @@ def apply_unit_conversions(matched_data: Dict) -> List[Dict]:
                 # Используем только первую конвертацию
                 break
     
-    logger.info(f"Applied {len(conversions_applied)} unit conversions")
+    logger.info("Applied {} unit conversions".format(len(conversions_applied)))
     return conversions_applied
 
 
@@ -87,7 +87,7 @@ def format_invoice_data(user_data: Dict) -> str:
     supplier = matched_data.get("supplier", "Неизвестный поставщик")
     total = matched_data.get("total", 0)
     
-    message = f"📄 *Накладная от {supplier}*\n\n"
+    message = "📄 *Накладная от {}*\n\n".format(supplier)
     
     # Добавляем информацию о товарах
     message += "*Товары:*\n"
@@ -102,12 +102,15 @@ def format_invoice_data(user_data: Dict) -> str:
         match_score = line.get("match_score", 0)
         
         # Форматируем строку с товаром
-        item_line = f"{line_num}. {name} - {qty} {unit} × {price} = {qty * price:.2f}"
+        item_price = qty * price
+        item_line = "{}. {} - {} {} × {} = {:.2f}".format(
+            line_num, name, qty, unit, price, item_price
+        )
         
         # Добавляем информацию о сопоставлении
         if product_id:
             status = "✅" if match_score > 0.8 else "⚠️"
-            item_line += f" {status}"
+            item_line += " {}".format(status)
         else:
             item_line += " ❓"
             
@@ -118,13 +121,16 @@ def format_invoice_data(user_data: Dict) -> str:
     if conversions:
         message += "\n*Применённые конвертации:*\n"
         for conv in conversions:
-            message += (
-                f"• {conv['product_name']}: {conv['original_qty']} {conv['original_unit']} → "
-                f"{conv['converted_qty']} {conv['converted_unit']}\n"
+            message += "• {}: {} {} → {} {}\n".format(
+                conv['product_name'],
+                conv['original_qty'],
+                conv['original_unit'],
+                conv['converted_qty'],
+                conv['converted_unit']
             )
     
     # Добавляем общую сумму
-    message += f"\n*Итого:* {total:.2f}"
+    message += "\n*Итого:* {:.2f}".format(total)
     
     return message
 
@@ -145,8 +151,8 @@ def format_final_invoice(user_data: Dict) -> str:
     supplier = matched_data.get("supplier", "Неизвестный поставщик")
     total = matched_data.get("total", 0)
     
-    message = f"📋 *ФИНАЛЬНАЯ НАКЛАДНАЯ*\n\n"
-    message += f"*Поставщик:* {supplier}\n\n"
+    message = "📋 *ФИНАЛЬНАЯ НАКЛАДНАЯ*\n\n"
+    message += "*Поставщик:* {}\n\n".format(supplier)
     
     # Добавляем таблицу товаров
     message += "*ТОВАРЫ:*\n"
@@ -165,7 +171,10 @@ def format_final_invoice(user_data: Dict) -> str:
         display_name = name[:27] + "..." if len(name) > 30 else name
         
         # Форматируем строку таблицы
-        line_str = f"{line_num:<3} {display_name:<30} {qty} {unit:<6} {price:<10.2f} {qty * price:<10.2f}\n"
+        item_price = qty * price
+        line_str = "{:<3} {:<30} {} {:<6} {:<10.2f} {:<10.2f}\n".format(
+            line_num, display_name, qty, unit, price, item_price
+        )
         message += line_str
     
     message += "-" * 70 + "\n"
@@ -215,9 +224,11 @@ def match_invoice_items(invoice_data: Dict) -> Dict:
         if product_id and score > 0:
             line["product_id"] = product_id
             line["match_score"] = score
-            logger.info(f"Matched item: {line['name']} -> {product_id} (score: {score:.2f})")
+            logger.info("Matched item: {} -> {} (score: {:.2f})".format(
+                line["name"], product_id, score
+            ))
         else:
-            logger.info(f"No match found for item: {line['name']}")
+            logger.info("No match found for item: {}".format(line["name"]))
         
         lines.append(line)
     
@@ -250,7 +261,7 @@ def prepare_invoice_data_for_syrve(matched_data: Dict) -> Dict:
     # Преобразуем товары в формат Syrve
     for line in matched_data.get("lines", []):
         if not line.get("product_id"):
-            logger.warning(f"Skipping item without product_id: {line.get('name')}")
+            logger.warning("Skipping item without product_id: {}".format(line.get("name")))
             continue
             
         syrve_item = {
@@ -286,14 +297,14 @@ def save_invoice_data(user_id: int, matched_data: Dict) -> str:
     
     # Генерируем имя файла с датой и ID пользователя
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"invoice_{user_id}_{timestamp}.json"
+    filename = "invoice_{}_{}.json".format(user_id, timestamp)
     file_path = os.path.join(history_dir, filename)
     
     # Сохраняем данные в файл
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(matched_data, f, ensure_ascii=False, indent=2)
     
-    logger.info(f"Saved invoice data to {file_path}")
+    logger.info("Saved invoice data to {}".format(file_path))
     return file_path
 
 
@@ -313,9 +324,11 @@ async def check_product_exists(product_name: str) -> Tuple[bool, Optional[str]]:
     product_id, score = match(product_name)
     
     if product_id and score > 0.9:
-        logger.info(f"Product exists: {product_name} -> {product_id} (score: {score:.2f})")
+        logger.info("Product exists: {} -> {} (score: {:.2f})".format(
+            product_name, product_id, score
+        ))
         return True, product_id
     
     # Если товар не найден, возвращаем False и None
-    logger.info(f"Product does not exist: {product_name}")
+    logger.info("Product does not exist: {}".format(product_name))
     return False, None
