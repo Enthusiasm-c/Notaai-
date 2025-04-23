@@ -8,7 +8,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from openai import AsyncOpenAI, OpenAI
+from openai import AsyncOpenAI
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -86,7 +86,7 @@ async def process_image_with_openai(api_key: str, image_data: bytes) -> Optional
         
         # Создаем промпт для извлечения данных
         prompt = """
-        Извлеки всю информацию из этой накладной. 
+        Извлеки всю информацию из этой накладной.
         Верни JSON со следующими полями:
         - supplier (строка): название поставщика
         - items (массив): список товаров, каждый с полями:
@@ -106,7 +106,7 @@ async def process_image_with_openai(api_key: str, image_data: bytes) -> Optional
             model="gpt-4-vision-preview",
             messages=[
                 {
-                    "role": "user", 
+                    "role": "user",
                     "content": [
                         {"type": "text", "text": prompt},
                         {
