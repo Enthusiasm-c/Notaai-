@@ -30,9 +30,7 @@ async def setup_bot():
     application.add_handler(CommandHandler("help", help_command))
 
     # Добавление обработчика для фото и PDF-документов
-    application.add_handler(
-        MessageHandler(filters.PHOTO | filters.Document.PDF, handle_invoice)
-    )
+    application.add_handler(MessageHandler(filters.PHOTO | filters.Document.PDF, handle_invoice))
 
     # Добавление обработчика для обратных запросов
     application.add_handler(CallbackQueryHandler(handle_callback_query))
@@ -42,23 +40,20 @@ async def setup_bot():
 
 async def ping_handler(request):
     """Обработчик запросов для проверки работоспособности"""
-    return web.Response(
-        text=json.dumps({"status": "ok"}),
-        content_type="application/json"
-    )
+    return web.Response(text=json.dumps({"status": "ok"}), content_type="application/json")
 
 
 async def run_web_server():
     """Запуск веб-сервера для health-check endpoint"""
     app = web.Application()
-    app.add_routes([web.get('/ping', ping_handler)])
-    
-    port = int(os.environ.get('PORT', 8080))
+    app.add_routes([web.get("/ping", ping_handler)])
+
+    port = int(os.environ.get("PORT", 8080))
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
+    site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
-    
+
     logger.info(f"Health check endpoint running on port {port}")
 
 
@@ -66,7 +61,7 @@ async def main():
     """Основная функция для запуска бота и веб-сервера"""
     # Запуск веб-сервера для health-check endpoint
     await run_web_server()
-    
+
     # Настройка и запуск бота
     application = await setup_bot()
     await application.initialize()
