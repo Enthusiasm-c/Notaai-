@@ -2,8 +2,9 @@
 Модуль для обработки данных накладной.
 """
 
+import dataclasses
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from utils.learning import load_unit_conversions
 
@@ -67,7 +68,7 @@ def apply_unit_conversions(matched_data: Dict) -> List[Dict]:
                 # Используем только первую конвертацию
                 break
     
-    logger.info("Applied {} unit conversions".format(len(conversions_applied)))
+    logger.info("Applied %d unit conversions", len(conversions_applied))
     return conversions_applied
 
 
@@ -190,7 +191,7 @@ def format_final_invoice(user_data: Dict) -> str:
     return message
 
 
-def match_invoice_items(invoice_data: Dict) -> Dict:
+async def match_invoice_items(invoice_data) -> Dict:
     """
     Сопоставляет товары из накладной с базой данных.
 
@@ -203,11 +204,11 @@ def match_invoice_items(invoice_data: Dict) -> Dict:
     from utils.match import match
     
     # Создаем копию данных, чтобы не изменять оригинал
-    matched_data = invoice_data.copy()
+    matched_data: Dict[str, Any] = dataclasses.asdict(invoice_data)
     
     # Преобразуем товары в формат строк для сопоставления
     lines = []
-    for item in invoice_data.get("items", []):
+    for item in invoice_data.items:
         # Создаем базовую структуру строки
         line = {
             "name": item.get("name", ""),
@@ -224,11 +225,9 @@ def match_invoice_items(invoice_data: Dict) -> Dict:
         if product_id and score > 0:
             line["product_id"] = product_id
             line["match_score"] = score
-            logger.info("Matched item: {} -> {} (score: {:.2f})".format(
-                line["name"], product_id, score
-            ))
+            logger.info("Matched item: %s -> %s (score: %.2f)", line["name"], product_id, score)
         else:
-            logger.info("No match found for item: {}".format(line["name"]))
+            logger.info("No match found for item: %s", line["name"])
         
         lines.append(line)
     
@@ -261,7 +260,7 @@ def prepare_invoice_data_for_syrve(matched_data: Dict) -> Dict:
     # Преобразуем товары в формат Syrve
     for line in matched_data.get("lines", []):
         if not line.get("product_id"):
-            logger.warning("Skipping item without product_id: {}".format(line.get("name")))
+            logger.warning("Skipping item without product_id: %s", line.get("name"))
             continue
             
         syrve_item = {
@@ -304,7 +303,7 @@ def save_invoice_data(user_id: int, matched_data: Dict) -> str:
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(matched_data, f, ensure_ascii=False, indent=2)
     
-    logger.info("Saved invoice data to {}".format(file_path))
+    logger.info("Saved invoice data to %s", file_path)
     return file_path
 
 
@@ -324,11 +323,9 @@ async def check_product_exists(product_name: str) -> Tuple[bool, Optional[str]]:
     product_id, score = match(product_name)
     
     if product_id and score > 0.9:
-        logger.info("Product exists: {} -> {} (score: {:.2f})".format(
-            product_name, product_id, score
-        ))
+        logger.info("Product exists: %s -> %s (score: %.2f)", product_name, product_id, score)
         return True, product_id
     
     # Если товар не найден, возвращаем False и None
-    logger.info("Product does not exist: {}".format(product_name))
+    logger.info("Product does not exist: %s", product_name)
     return False, None
