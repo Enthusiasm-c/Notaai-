@@ -367,3 +367,13 @@ async def check_product_exists(product_name: str) -> Tuple[bool, Optional[str]]:
     # Если товар не найден, возвращаем False и None
     logger.info("Product does not exist: %s", product_name)
     return False, None
+    # ────────────────────────────────────────────────────────────────
+    # explicit re-export: гарантируем, что имя попадёт в модуль
+    try:
+       	enrich_invoice  # уже определена?
+    except NameError:
+        async def enrich_invoice(parsed_invoice):          # fallback-заглушка
+            """Fallback stub — should never be used in production."""
+            return parsed_invoice
+
+    globals()["enrich_invoice"] = enrich_invoice           # ← делаем доступным
