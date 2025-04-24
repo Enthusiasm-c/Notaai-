@@ -1,36 +1,91 @@
-# scripts/find_missing_imports.py
-import ast, pathlib, importlib.util, sys
+#!/usr/bin/env python
+"""
+Поиск «мёртвых» импортов во всём проекте.
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]   # корень репо
-sys.path.insert(0, str(ROOT))                        # чтобы находить local-пакеты
+Сканирует каждый *.py файл, пытается «разрешить» каждый абсолютный импорт
+и выводит список модулей, которые Python не смог найти в sys.meta_path.
 
-missing: dict[str, list[str]] = {}                  # {module: [file:line]}
+Выходы:
+  • 0 — все импорты валидны
+  • 1 — найден хотя бы один неразрешённый импорт
+  • 2 — скрипт запущен вне git-репозитория или другая системная ошибка
+"""
+from __future__ import annotations
 
-for path in ROOT.rglob("*.py"):
-    if "venv" in path.parts or path.name == "__init__.py":
-        continue
-    with open(path, "r", encoding="utf-8") as f:
-        tree = ast.parse(f.read(), filename=str(path))
+import ast
+import importlib.util
+import pathlib
+import sys
+from typing import DefaultDict, List
 
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                mod = alias.name.split(".")[0]
-                if importlib.util.find_spec(mod) is None:
-                    missing.setdefault(mod, []).append(f"{path}:{node.lineno}")
-        elif isinstance(node, ast.ImportFrom):
-            if node.level == 0 and node.module:      # абсолютный импорт
-                mod = node.module.split(".")[0]
-                if importlib.util.find_spec(mod) is None:
-                    missing.setdefault(mod, []).append(f"{path}:{node.lineno}")
 
-if not missing:
-    print("✅  broken imports not found.")
-    sys.exit(0)
+def main() -> None:
+    try:
+        root_dir = pathlib.Path(__file__).resolve().parents[1]  # корень репо
+    except IndexError:
+        print("❌  Cannot determine repository root")
+        sys.exit(2)
 
-print("❌  BROKEN IMPORTS:")
-for mod, places in missing.items():
-    for place in places:
-        print(f"{place}  →  {mod}")
+    # добавляем корень проекта в PYTHONPATH, чтобы находились локальные пакеты
+    sys.path.insert(0, str(root_dir))
 
-sys.exit(1)
+    missing: DefaultDict[str, List[str]] = DefaultDict(list)
+
+    for path in root_dir.rglob("*.py"):
+        # пропускаем виртуальные окружения, кэш и миграции
+        if any(part in {"venv", ".venv", "__pypackages__"} for part in path.parts):
+            continue
+        if path.name == "__init__.py":
+            continue
+
+        with path.open("r", encoding="utf-8") as file:
+            try:
+                tree = ast.parse(file.read(), filename=str(path))
+            except SyntaxError as exc:
+                print(f"⚠️  SyntaxError in {path}:{exc.lineno} — {exc.msg}")
+                continue
+
+        for node in ast.walk(tree):
+            # import xxx, yyy
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    module_name = alias.name.split(".")[0]
+                    _collect_if_missing(module_name, missing, path, node.lineno)
+
+            # from xxx.yyy import zzz
+            elif isinstance(node, ast.ImportFrom):
+                if node.level == 0 and node.module:  # абсолютный импорт
+                    module_name = node.module.split(".")[0]
+                    _collect_if_missing(module_name, missing, path, node.lineno)
+
+    _report_and_exit(missing)
+
+
+def _collect_if_missing(
+    module_name: str,
+    bucket: DefaultDict[str, List[str]],
+    path: pathlib.Path,
+    lineno: int,
+) -> None:
+    """Добавляем модуль в список, если importlib не может его найти."""
+    if importlib.util.find_spec(module_name) is None:
+        bucket[module_name].append(f"{path}:{lineno}")
+
+
+def _report_and_exit(
+    missing: DefaultDict[str, List[str]],
+) -> None:
+    if not missing:
+        print("✅  Broken imports not found.")
+        sys.exit(0)
+
+    print("\n❌  BROKEN IMPORTS DETECTED:")
+    for module_name, occurrences in missing.items():
+        for place in occurrences:
+            print(f"{place}  →  {module_name}")
+
+    sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
