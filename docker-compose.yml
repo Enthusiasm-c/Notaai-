@@ -1,5 +1,8 @@
 services:
   bot:
+    environment:
+      - PYTHONPATH=/app
+    
 
     image: ghcr.io/enthusiasm-c/notaai:develop
     env_file: .env
