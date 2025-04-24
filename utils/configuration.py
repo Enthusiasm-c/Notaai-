@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from pydantic_settings import BaseSettings
-from pydantic import Field, ValidationErro
+from pydantic import Field, ValidationError
 
 
 class Config(BaseSettings):
