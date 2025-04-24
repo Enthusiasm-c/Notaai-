@@ -5,7 +5,7 @@
 import dataclasses
 import datetime
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 from utils.learning import load_unit_conversions
 
