@@ -14,7 +14,6 @@ from config import (
     ADD_NEW_ITEM,
     CONFIRMATION,
     EDIT_ITEM,
-    FINAL_CONFIRMATION,
     SELECT_EDIT_ITEM,
     SET_CONVERSION,
     WAIT_PHOTO,
