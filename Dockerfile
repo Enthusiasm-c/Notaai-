@@ -25,6 +25,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 FROM python:3.11-slim
 
 WORKDIR /app
+ENV PYTHONPATH=/app:$PYTHONPATH
 
 # Install runtime dependencies (curl for healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
