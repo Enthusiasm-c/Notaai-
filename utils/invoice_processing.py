@@ -5,7 +5,7 @@
 import dataclasses
 import datetime
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from utils.learning import load_unit_conversions
 
@@ -238,74 +238,119 @@ async def match_invoice_items(invoice_data) -> Dict:
     return matched_data
 
 
-def prepare_invoice_data_for_syrve(matched_data: Dict) -> Dict:
+async def enrich_invoice(invoice_data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Подготавливает данные накладной для отправки в Syrve.
-
+    Обогащает данные накладной дополнительной информацией.
+    
     Args:
-        matched_data: Данные накладной с сопоставленными товарами
-
+        invoice_data: Исходные данные накладной
+        
     Returns:
-        dict: Данные в формате для Syrve API
+        dict: Обогащенные данные накладной
     """
-    import datetime
+    from utils.match import match_products
     
-    # Базовые данные накладной
-    syrve_data = {
-        "date": datetime.datetime.now().strftime("%Y-%m-%d"),
-        "supplier": matched_data.get("supplier", "Неизвестный поставщик"),
-        "items": [],
-        "total": matched_data.get("total", 0),
-    }
+    # Создаем копию входных данных
+    enriched_data = invoice_data.copy()
     
-    # Преобразуем товары в формат Syrve
-    for line in matched_data.get("lines", []):
-        if not line.get("product_id"):
-            logger.warning("Skipping item without product_id: %s", line.get("name"))
-            continue
+    # Обогащаем каждый товар в накладной
+    items = enriched_data.get("items", [])
+    enriched_items = []
+    
+    for item in items:
+        # Получаем данные товара
+        name = item.get("name", "")
+        
+        # Сопоставляем с продуктами
+        product_match = await match_products(name)
+        
+        # Обогащаем товар данными о продукте
+        enriched_item = item.copy()
+        
+        if product_match and len(product_match) >= 3:
+            product_id, score, product_info = product_match
             
-        syrve_item = {
-            "product_id": line["product_id"],
-            "name": line["name"],
-            "quantity": line["qty"],
-            "unit": line["unit"],
-            "price": line["price"],
-        }
-        syrve_data["items"].append(syrve_item)
+            enriched_item["product_id"] = product_id
+            enriched_item["match_score"] = score
+            
+            # Добавляем дополнительную информацию о продукте
+            if product_info:
+                for key, value in product_info.items():
+                    if key not in enriched_item:
+                        enriched_item[key] = value
+        
+        enriched_items.append(enriched_item)
     
-    return syrve_data
+    # Обновляем список товаров
+    enriched_data["items"] = enriched_items
+    
+    # Добавляем дополнительную информацию
+    enriched_data["processed_at"] = datetime.datetime.now().isoformat()
+    enriched_data["is_enriched"] = True
+    
+    return enriched_data
 
 
-def save_invoice_data(user_id: int, matched_data: Dict) -> str:
+def format_invoice_for_display(invoice_dict: Dict) -> str:
     """
-    Сохраняет данные накладной в файл для истории.
-
+    Форматирует данные накладной для отображения в Telegram.
+    
     Args:
-        user_id: ID пользователя
-        matched_data: Данные накладной с сопоставленными товарами
-
+        invoice_dict: Словарь с данными накладной
+        
     Returns:
-        str: Путь к сохраненному файлу
+        str: Отформатированный текст накладной
     """
-    import datetime
-    import json
-    import os
+    # Извлекаем основные данные
+    vendor = invoice_dict.get("vendor_name", "Неизвестный поставщик")
+    date = invoice_dict.get("date", datetime.datetime.now().strftime("%Y-%m-%d"))
+    total = invoice_dict.get("total_amount", 0)
+    items = invoice_dict.get("items", [])
     
-    # Создаем директорию для истории накладных, если ее нет
-    history_dir = os.path.join("data", "history")
-    os.makedirs(history_dir, exist_ok=True)
+    # Форматируем дату
+    try:
+        date_obj = datetime.datetime.strptime(date, "%Y-%m-%d")
+        formatted_date = date_obj.strftime("%d.%m.%Y")
+    except (ValueError, TypeError):
+        formatted_date = date
     
-    # Генерируем имя файла с датой и ID пользователя
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = "invoice_{}_{}.json".format(user_id, timestamp)
-    file_path = os.path.join(history_dir, filename)
+    # Формируем заголовок
+    result = [
+        "📄 <b>Накладная</b>",
+        f"<b>Поставщик:</b> {vendor}",
+        f"<b>Дата:</b> {formatted_date}",
+        ""
+    ]
     
-    # Сохраняем данные в файл
-    with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(matched_data, f, ensure_ascii=False, indent=2)
+    # Формируем таблицу товаров
+    result.append("<b>Товары:</b>")
     
-    logger.info("Saved invoice data to %s", file_path)
-    return file_path
+    for i, item in enumerate(items, 1):
+        name = item.get("name", "")
+        quantity = item.get("quantity", 0)
+        unit = item.get("unit", "шт")
+        price = item.get("price", 0)
+        total_item = quantity * price
+        
+        # Ограничиваем длину названия
+        display_name = name
+        if len(name) > 22:
+            display_name = name[:22] + "..."
+        
+        # Форматируем строку товара
+        item_line = f"{i}. {display_name} - {quantity} {unit} × {price:.2f} = {total_item:.2f} руб."
+        
+        # Добавляем информацию о сопоставлении
+        if "product_id" in item and item["product_id"]:
+            item_line += " ✓"
+        
+        result.append(item_line)
+    
+    # Добавляем итоговую сумму
+    result.append("")
+    result.append(f"<b>Итого:</b> {total:.2f} руб.")
+    
+    return "\n".join(result)
 
 
 async def check_product_exists(product_name: str) -> Tuple[bool, Optional[str]]:
@@ -330,111 +375,3 @@ async def check_product_exists(product_name: str) -> Tuple[bool, Optional[str]]:
     # Если товар не найден, возвращаем False и None
     logger.info("Product does not exist: %s", product_name)
     return False, None
-
-
-def format_invoice_for_display(invoice_dict: Dict) -> str:
-    """
-    Преобразует результат match_invoice_items (словарь) в читабельный
-    текст для Telegram: шапка, таблица строк, итог.
-    
-    Args:
-        invoice_dict: Словарь данных накладной
-
-    Returns:
-        str: Отформатированная строка для отображения
-
-    Требования:
-    * Не использовать markdown, только моноширинный текст.
-    * Колонки: №, Наименование (обрезать до 22 симв), Кол-во+ед, Цена.
-    * Выравнивание по ширине 60 символов.
-    * Возвращает готовую строку.
-    """
-    # Извлекаем данные из словаря
-    vendor_name = invoice_dict.get("vendor_name", "Неизвестный поставщик")
-    date = invoice_dict.get("date", datetime.datetime.now().strftime("%Y-%m-%d"))
-    total_amount = invoice_dict.get("total_amount", 0)
-    items = invoice_dict.get("items", [])
-    
-    # Форматируем дату (если задана как строка в формате YYYY-MM-DD)
-    try:
-        date_obj = datetime.datetime.strptime(date, "%Y-%m-%d")
-        formatted_date = date_obj.strftime("%d.%m.%Y")
-    except (ValueError, TypeError):
-        formatted_date = date
-    
-    # Формируем заголовок
-    header = [
-        "╔══════════════════════════════════════════════════════════╗",
-        f"║ Поставщик: {vendor_name:<43}║",
-        f"║ Дата: {formatted_date:<49}║",
-        "╠═════╦════════════════════════╦══════════════╦═════════════╣",
-        "║  №  ║ Наименование           ║ Кол-во       ║    Цена     ║",
-        "╠═════╬════════════════════════╬══════════════╬═════════════╣"
-    ]
-    
-    # Формируем строки таблицы
-    rows = []
-    for i, item in enumerate(items, 1):
-        name = item.get("name", "")
-        # Обрезаем имя до 22 символов
-        name_display = name[:22] + "..." if len(name) > 22 else name.ljust(22)
-        
-        quantity = item.get("quantity", 0)
-        unit = item.get("unit", "шт")
-        price = item.get("price", 0)
-        
-        # Форматируем строку таблицы
-        qty_str = f"{quantity} {unit}"
-        row = f"║ {i:3} ║ {name_display} ║ {qty_str:12} ║ {price:11.2f} ║"
-        rows.append(row)
-    
-    # Формируем подвал таблицы
-    footer = [
-        "╠═════╩════════════════════════╩══════════════╩═════════════╣",
-        f"║ ИТОГО: {total_amount:52.2f} ║",
-        "╚══════════════════════════════════════════════════════════╝"
-    ]
-    
-    # Объединяем все части
-    result = "\n".join(header + rows + footer)
-    return result
-
-
-def test_format_invoice_for_display():
-    """
-    Unit-тест для функции format_invoice_for_display
-    """
-    # Тестовые данные
-    test_invoice = {
-        "vendor_name": "ООО Тестовый поставщик",
-        "date": "2023-05-15",
-        "total_amount": 12345.67,
-        "items": [
-            {"name": "Товар с длинным наименованием для теста", "quantity": 10, "unit": "шт", "price": 100.50},
-            {"name": "Короткий товар", "quantity": 5, "unit": "кг", "price": 2009.00},
-            {"name": "Товар без единиц", "quantity": 3, "price": 100.00}
-        ]
-    }
-    
-    # Вызываем функцию форматирования
-    result = format_invoice_for_display(test_invoice)
-    
-    # Проверки
-    assert "ООО Тестовый поставщик" in result
-    assert "15.05.2023" in result
-    assert "12345.67" in result
-    assert "Товар с длинным наимен..." in result
-    assert "Короткий товар" in result
-    assert "10 шт" in result
-    assert "5 кг" in result
-    assert "3 шт" in result
-    assert "100.50" in result
-    assert "2009.00" in result
-    assert "100.00" in result
-    
-    # Проверка длины строки (должна быть 60 символов в ширину)
-    lines = result.split("\n")
-    for line in lines:
-        assert len(line) == 60, f"Строка должна быть 60 символов: '{line}'"
-    
-    print("Все тесты пройдены!")
