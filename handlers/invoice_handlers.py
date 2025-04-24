@@ -7,6 +7,7 @@
 import json
 import logging
 import tempfile
+import inspect 
 from dataclasses import asdict
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from utils.configuration import Config
 from utils.error_handling import log_error, save_error_image
 from utils.invoice_processing import enrich_invoice, format_invoice_for_display
 from utils.storage import save_temp_file
+from utils.async_tools import ensure_result
 
 __all__ = ["handle_invoice", "handle_invoice_callback"]
 
@@ -85,7 +87,8 @@ async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         logger.info(f"OCR result: {json.dumps(asdict(invoice_data), ensure_ascii=False)[:500]}...")
         
         # Сопоставляем товары из накладной с базой данных
-        enriched_data = await enrich_invoice(asdict(invoice_data))
+        raw = await enrich_invoice(asdict(invoice_data))
+        enriched_data = await ensure_result(raw)   # ← гарантируем dict
         
         # Форматируем данные накладной для отображения
         formatted_message = format_invoice_for_display(enriched_data)
