@@ -174,3 +174,54 @@ def save_product(product_id: str, product_name: str, category: str = "") -> bool
     except Exception as e:
         logger.error(f"Error saving product: {e}", exc_info=True)
         return False
+
+
+async def match_products(items: List[Dict]) -> List[Dict]:
+    """
+    Сопоставляет список товаров с базой данных
+
+    Args:
+        items: Список товаров для сопоставления
+
+    Returns:
+        list: Список обогащенных товаров с результатами сопоставления
+    """
+    # Создаем копию списка товаров
+    enriched_items = []
+    
+    # Обрабатываем каждый товар
+    for item in items:
+        # Создаем копию товара
+        enriched_item = item.copy()
+        
+        # Получаем название товара
+        item_name = item.get("name", "")
+        
+        if not item_name:
+            enriched_items.append(enriched_item)
+            continue
+        
+        # Сопоставляем товар с базой данных
+        product_id, score = match(item_name)
+        
+        # Добавляем результаты сопоставления
+        enriched_item["match_score"] = score
+        
+        # Если оценка сопоставления выше порога, добавляем ID товара
+        if score >= 0.6 and product_id:
+            enriched_item["product_id"] = product_id
+            
+            # Можно добавить дополнительную информацию о товаре
+            product_data = get_product_by_id(product_id)
+            if product_data:
+                # Добавляем дополнительные данные товара, если они ещё не заданы
+                for key, value in product_data.items():
+                    if key not in enriched_item:
+                        enriched_item[key] = value
+        else:
+            enriched_item["product_id"] = None
+        
+        # Добавляем обогащенный товар в результирующий список
+        enriched_items.append(enriched_item)
+    
+    return enriched_items
