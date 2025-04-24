@@ -1,6 +1,6 @@
-import os
 import json
 import logging
+import os
 from typing import Dict, Optional
 
 # Set up logging
@@ -119,6 +119,8 @@ def load_unit_conversions() -> Dict[str, Dict[str, float]]:
     Returns:
         dict: Unit conversions
     """
+    global unit_conversions
+
     # If cache is already populated, return it
     if unit_conversions:
         return unit_conversions
@@ -133,7 +135,6 @@ def load_unit_conversions() -> Dict[str, Dict[str, float]]:
             loaded_conversions = json.load(f)
 
         # Store in cache
-        global unit_conversions
         unit_conversions = loaded_conversions
         logger.info(f"Loaded unit conversions for {len(unit_conversions)} units")
         return unit_conversions
@@ -154,8 +155,6 @@ def save_unit_conversion(from_unit: str, to_unit: str, factor: float) -> bool:
     Returns:
         bool: Success status
     """
-    global unit_conversions
-
     try:
         # Load existing conversions
         conversions = load_unit_conversions()
@@ -180,6 +179,7 @@ def save_unit_conversion(from_unit: str, to_unit: str, factor: float) -> bool:
             json.dump(conversions, f, ensure_ascii=False, indent=2)
 
         # Update cache
+        global unit_conversions
         unit_conversions = conversions
 
         logger.info(f"Saved new unit conversion: {from_unit} -> {to_unit} (factor: {factor})")
