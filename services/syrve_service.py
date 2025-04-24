@@ -1,5 +1,6 @@
-"""Service for interacting with Syrve ERP API"""
-
+"""
+Service for interacting with Syrve ERP API
+"""
 import datetime
 import logging
 from typing import Any, Dict, Optional
@@ -184,8 +185,27 @@ async def commit_document(document_id: str, token: str, base_url: str) -> bool:
         bool: True if commit successful
     """
     logger.info(f"Committing document with ID: {document_id}")
-    # Implementation would go here
-    pass
+    try:
+        # Prepare headers
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        
+        # Send request to commit document
+        response = requests.post(
+            f"{base_url}/documents/{document_id}/commit",
+            headers=headers,
+            timeout=10
+        )
+        
+        # Check response
+        if response.status_code in (200, 204):
+            logger.info(f"Successfully committed document with ID: {document_id}")
+            return True
+        else:
+            logger.error(f"Failed to commit document: {response.status_code} - {response.text}")
+            return False
+    except Exception as e:
+        logger.error(f"Error committing document: {str(e)}", exc_info=True)
+        return False
 
 
 async def send_invoice_to_syrve(invoice_data: Dict[str, Any], login: str, password: str, base_url: str) -> Optional[str]:
@@ -203,4 +223,11 @@ async def send_invoice_to_syrve(invoice_data: Dict[str, Any], login: str, passwo
     """
     logger.info("Sending invoice to Syrve")
     service = SyrveService(login, password, base_url)
-    return await service.create_invoice(invoice_data)
+    document_id = await service.create_invoice(invoice_data)
+    
+    if document_id:
+        logger.info(f"Successfully created document with ID: {document_id}")
+        return document_id
+    else:
+        logger.error("Failed to create document in Syrve")
+        return None
