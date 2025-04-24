@@ -14,3 +14,9 @@ data/learned/
 .venv/
 .venv/
 .venv/
+
+# Lint artefacts
+claude_*.zip
+lint_*.txt
+missing_*.txt
+runtime_*.txt
