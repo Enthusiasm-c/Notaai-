@@ -1,3 +1,5 @@
+import os
+os.environ.setdefault("TELEGRAM_TOKEN", os.getenv("TELEGRAM_BOT_TOKEN", ""))
 """
 Конфигурация и константы для работы бота NotaAI.
 """
