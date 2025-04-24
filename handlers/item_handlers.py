@@ -152,7 +152,7 @@ async def handle_item_selection(update: Update, context: ContextTypes.DEFAULT_TY
 
     except Exception as e:
         error_msg = f"Error in handle_item_selection: {e}"
-        log_error(error_msg, exc_info=True)
+        log_error(error_msg, e)
 
         try:
             await query.edit_message_text(
@@ -191,7 +191,8 @@ async def display_item_edit_options(query, user_id, item_index):
     unmatched_indices = []
     if is_unrecognized:
         unmatched_indices = [
-            i for i, l in enumerate(matched_data.get("lines", [])) if l.get("product_id") is None
+            i for i, item_line in enumerate(matched_data.get("lines", []))
+            if item_line.get("product_id") is None
         ]
         current_position = unmatched_indices.index(item_index) + 1
         total_unmatched = len(unmatched_indices)
@@ -493,14 +494,14 @@ async def handle_item_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     except Exception as e:
         error_msg = f"Error in handle_item_edit: {e}"
-        log_error(error_msg, exc_info=True)
+        log_error(error_msg, e)
 
         try:
             await query.edit_message_text(
                 text="❌ An error occurred. Please try again or start over with /cancel."
             )
         except Exception as inner_e:
-            log_error(f"Error sending error message: {inner_e}", exc_info=True)
+            log_error(f"Error sending error message: {inner_e}", inner_e)
 
         return WAIT_PHOTO
 
@@ -643,8 +644,8 @@ async def handle_manual_item_entry(update: Update, context: ContextTypes.DEFAULT
             # Считаем позицию среди неопознанных товаров
             unmatched_indices = [
                 i
-                for i, l in enumerate(matched_data.get("lines", []))
-                if l.get("product_id") is None
+                for i, item_line in enumerate(matched_data.get("lines", []))
+                if item_line.get("product_id") is None
             ]
             current_position = unmatched_indices.index(next_unmatched) + 1
             total_unmatched = len(unmatched_indices)
@@ -683,7 +684,7 @@ async def handle_manual_item_entry(update: Update, context: ContextTypes.DEFAULT
 
     except Exception as e:
         error_msg = f"Error in handle_manual_item_entry: {e}"
-        log_error(error_msg, exc_info=True)
+        log_error(error_msg, e)
         await update.message.reply_text(
             "❌ An error occurred. Please try again or start over with /cancel."
         )
@@ -823,7 +824,7 @@ async def handle_manual_entry_callback(update: Update, context: ContextTypes.DEF
 
     except Exception as e:
         error_msg = f"Error in handle_manual_entry_callback: {e}"
-        log_error(error_msg, exc_info=True)
+        log_error(error_msg, e)
 
         try:
             await query.edit_message_text(
@@ -951,8 +952,8 @@ async def handle_conversion_entry(update: Update, context: ContextTypes.DEFAULT_
                 # Проверяем наличие неопознанных товаров
                 unmatched_items = [
                     i
-                    for i, line in enumerate(matched_data.get("lines", []))
-                    if line.get("product_id") is None
+                    for i, item_line in enumerate(matched_data.get("lines", []))
+                    if item_line.get("product_id") is None
                 ]
 
                 if unmatched_items:
@@ -994,7 +995,7 @@ async def handle_conversion_entry(update: Update, context: ContextTypes.DEFAULT_
 
     except Exception as e:
         error_msg = f"Error in handle_conversion_entry: {e}"
-        log_error(error_msg, exc_info=True)
+        log_error(error_msg, e)
         await update.message.reply_text(
             "❌ An error occurred. Please try again or start over with /cancel."
         )
@@ -1046,7 +1047,7 @@ async def handle_conversion_callback(update: Update, context: ContextTypes.DEFAU
 
     except Exception as e:
         error_msg = f"Error in handle_conversion_callback: {e}"
-        log_error(error_msg, exc_info=True)
+        log_error(error_msg, e)
 
         try:
             await query.edit_message_text(
