@@ -1,260 +1,168 @@
-"""
-Обработчики для работы с накладными.
-"""
-
+import json
 import logging
-import os
-import uuid
+import tempfile
+from dataclasses import asdict
+from pathlib import Path
+from typing import Dict, Any
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from config import CONFIRMATION, WAIT_PHOTO
-from services.ocr_service import extract
-from services.syrve_service import create_invoice
-from utils.error_handling import log_error
-from utils.invoice_processing import apply_unit_conversions, match_invoice_items
+from services.ocr_service import OCRService
+from utils.configuration import Config
+from utils.error_handling import log_error, save_error_image
+from utils.invoice_processing import ParsedInvoice, format_invoice_for_display, match_invoice_items
+from utils.storage import save_temp_file
 
-# Получаем логгер
+# Set up logging
 logger = logging.getLogger(__name__)
 
-# Директория для временных файлов
-TMP_DIR = "/tmp/notaai"
 
-
-async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Обработчик для получения и обработки фото накладной.
+    Handle invoice photos and documents
 
     Args:
-        update: Входящее обновление от Telegram
-        context: Контекст бота
-
-    Returns:
-        int: Следующее состояние диалога
+        update: Telegram update object
+        context: Telegram context object
     """
-    # Проверяем, что это фото
-    if not update.message or not update.message.photo:
-        await update.message.reply_text("🖼 Пришлите фото накладной...")
-        return WAIT_PHOTO
-
-    # Сообщаем пользователю, что начали обработку
-    await update.message.reply_text("📸 Получил фото! Обрабатываю накладную...")
-
     try:
-        # Получаем файл с наилучшим качеством
-        photo = update.message.photo[-1]
-        photo_file = await photo.get_file()
-        
-        # Создаем директорию для временных файлов, если её нет
-        os.makedirs(TMP_DIR, exist_ok=True)
-        
-        # Генерируем имя файла и сохраняем фото
-        file_unique_id = f"invoice_{update.effective_chat.id}_{uuid.uuid4()}"
-        photo_path = f"{TMP_DIR}/{file_unique_id}.jpg"
-        await photo_file.download_to_drive(custom_path=photo_path)
-        
-        logger.info("Saved photo to %s", photo_path)
-        
-        # Извлекаем данные из фото с помощью OCR
-        logger.info("Starting OCR extraction for chat %s", update.effective_chat.id)
-        invoice_data = await extract(photo_path)
-        
-        if not invoice_data:
+        user = update.effective_user
+        logger.info(f"Received invoice from {user.id} ({user.username})")
+
+        # Send processing message
+        processing_message = await update.message.reply_text(
+            "⏳ Обрабатываю документ... Это может занять до 30 секунд."
+        )
+
+        # Get file ID
+        file_id = None
+        file_type = None
+
+        if update.message.photo:
+            # Get the largest photo
+            file_id = update.message.photo[-1].file_id
+            file_type = "photo"
+        elif update.message.document:
+            file_id = update.message.document.file_id
+            file_type = "document"
+        else:
             await update.message.reply_text(
-                "❌ Не удалось распознать накладную. Пожалуйста, попробуйте еще раз с более "
-                "четким изображением."
+                "❌ Пожалуйста, отправьте фото накладной или PDF-документ."
             )
-            return WAIT_PHOTO
-            
-        # Логируем количество найденных позиций
-        items_count = len(invoice_data.items)
-        logger.info("OCR parsed %d items for chat %s", items_count, update.effective_chat.id)
+            return
+
+        # Download file
+        file = await context.bot.get_file(file_id)
         
-        if items_count == 0:
-            await update.message.reply_text(
-                "📄 Не найдены товары в накладной. Пожалуйста, убедитесь, что изображение "
-                "содержит таблицу товаров."
-            )
-            return WAIT_PHOTO
-            
-        # Сопоставляем товары с базой данных
-        matched_data = await match_invoice_items(invoice_data)
-        logger.info("Matched items with database")
+        # Create temporary directory if it doesn't exist
+        temp_dir = Path("/tmp") / "notaai"
+        temp_dir.mkdir(parents=True, exist_ok=True)
         
-        # Применяем конвертации единиц измерения
-        conversions = apply_unit_conversions(matched_data)
-        logger.info("Applied %d unit conversions", len(conversions))
-        
-        # Сохраняем данные в контексте для дальнейшего использования
-        context.user_data["invoice"] = matched_data
-        
-        # Форматируем превью для пользователя
-        preview_text = format_invoice_preview(matched_data)
-        
-        # Генерируем уникальный идентификатор для callback_data
-        invoice_id = str(uuid.uuid4())
-        context.user_data["invoice_id"] = invoice_id
-        
-        # Создаем клавиатуру с кнопками подтверждения/редактирования
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, dir=temp_dir, suffix=".jpg") as temp_file:
+            temp_path = temp_file.name
+            await file.download_to_drive(temp_path)
+
+        # Process the image with OCR
+        config = Config()
+        ocr_service = OCRService(api_key=config.OPENAI_API_KEY, model=config.OPENAI_MODEL)
+
+        with open(temp_path, "rb") as f:
+            image_data = f.read()
+
+        # Process the image
+        raw_data = await ocr_service.process_image(image_data)
+
+        # Create a ParsedInvoice from the OCR output
+        invoice_data = ParsedInvoice(
+            date=raw_data.get("date", ""),
+            vendor_name=raw_data.get("vendor_name", ""),
+            total_amount=raw_data.get("total_amount", 0),
+            lines=raw_data.get("items", [])
+        )
+
+        # Log the OCR result
+        logger.info(f"OCR result: {json.dumps(asdict(invoice_data), ensure_ascii=False)[:500]}...")
+
+        # Match invoice items with our product database
+        enriched_data = match_invoice_items(asdict(invoice_data))
+
+        # Format invoice data for display
+        formatted_message = format_invoice_for_display(enriched_data)
+
+        # Create confirmation keyboard
         keyboard = [
             [
-                InlineKeyboardButton(
-                    "✅ Подтвердить", callback_data=f"confirm_invoice:{invoice_id}"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    "✏️ Исправить позиции", callback_data=f"edit_items:{invoice_id}"
-                )
-            ],
+                InlineKeyboardButton("✅ Подтвердить", callback_data="confirm_invoice"),
+                InlineKeyboardButton("❌ Отклонить", callback_data="reject_invoice"),
+            ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        # Отправляем превью пользователю
-        await update.message.reply_text(preview_text, reply_markup=reply_markup)
-        
-        # Удаляем временный файл
-        try:
-            os.remove(photo_path)
-            logger.debug("Removed temporary file %s", photo_path)
-        except Exception as e:
-            logger.warning("Failed to remove temporary file: %s", e)
-        
-        return CONFIRMATION
-        
-    except Exception as e:
-        log_error(f"Error processing invoice photo: {e}", exc_info=True)
-        await update.message.reply_text(
-            "❌ Произошла ошибка при обработке фото. Пожалуйста, попробуйте еще раз."
+
+        # Save invoice data to user context
+        context.user_data["invoice"] = enriched_data
+
+        # Save the image to temporary storage
+        file_key = save_temp_file(user.id, image_data)
+        context.user_data["invoice_image_key"] = file_key
+
+        # Edit the processing message
+        await processing_message.edit_text(
+            formatted_message + "\n\n<i>Проверьте данные и подтвердите отправку.</i>",
+            reply_markup=reply_markup,
+            parse_mode="HTML",
         )
-        return WAIT_PHOTO
+
+    except Exception as e:
+        # Log error
+        log_error(f"Error processing invoice: {str(e)}", e)
+
+        # Save error image if available
+        if update.message.photo and "image_data" in locals():
+            save_error_image(user.id, image_data)
+
+        # Notify user
+        await update.message.reply_text(
+            "❌ Произошла ошибка при обработке документа. Пожалуйста, попробуйте еще раз или обратитесь за помощью."
+        )
 
 
-async def handle_invoice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Обработчик для кнопок подтверждения/редактирования накладной.
+    Handle callback queries from invoice confirmation buttons
 
     Args:
-        update: Входящее обновление от Telegram
-        context: Контекст бота
-
-    Returns:
-        int: Следующее состояние диалога
+        update: Telegram update object
+        context: Telegram context object
     """
     query = update.callback_query
+    user = query.from_user
+
+    # Answer callback query to stop loading indicator
     await query.answer()
-    
-    # Проверяем, что в контексте есть данные накладной
-    if "invoice" not in context.user_data:
-        await query.edit_message_text("❌ Данные накладной не найдены. Начните сначала.")
-        return WAIT_PHOTO
-    
-    # Обрабатываем подтверждение накладной
-    if query.data.startswith("confirm_invoice:"):
-        invoice_id = query.data.split(":", 1)[1]
-        
-        # Проверяем соответствие ID
-        if context.user_data.get("invoice_id") != invoice_id:
-            logger.warning(
-                "Invoice ID mismatch: %s != %s",
-                context.user_data.get("invoice_id"),
-                invoice_id
-            )
-            await query.edit_message_text(
-                "❌ Неверный идентификатор накладной. Пожалуйста, начните сначала."
-            )
-            return WAIT_PHOTO
-            
-        # Отправляем накладную в Syrve
-        await query.edit_message_text("⏳ Отправляю накладную в Syrve...")
-        
-        try:
-            # Получаем данные накладной
-            invoice_data = context.user_data["invoice"]
-            
-            # Отправляем в Syrve
-            doc_id = await create_invoice(invoice_data)
-            
-            if doc_id:
-                logger.info("Invoice successfully created in Syrve with ID: %s", doc_id)
-                await query.edit_message_text(
-                    f"📥 Накладная №{doc_id} успешно создана в Syrve."
-                )
-            else:
-                logger.error("Failed to create invoice in Syrve")
-                await query.edit_message_text(
-                    "❌ Не удалось создать накладную в Syrve. Пожалуйста, попробуйте позже."
-                )
-                
-            # Очищаем данные накладной
-            context.user_data.pop("invoice", None)
-            context.user_data.pop("invoice_id", None)
-            
-            return WAIT_PHOTO
-            
-        except Exception as e:
-            log_error(f"Error sending invoice to Syrve: {e}", exc_info=True)
-            await query.edit_message_text(
-                "❌ Произошла ошибка при отправке накладной. Пожалуйста, попробуйте позже."
-            )
-            return WAIT_PHOTO
-    
-    # Обрабатываем редактирование накладной
-    elif query.data.startswith("edit_items:"):
-        # Пока просто показываем сообщение
+
+    # Get callback data
+    callback_data = query.data
+
+    if callback_data == "confirm_invoice":
         await query.edit_message_text(
-            "🔧 Функция редактирования позиций будет доступна в следующей версии."
-            "\n\nОтправьте новое фото накладной."
+            query.message.text + "\n\n✅ <b>Подтверждено и отправлено в Syrve!</b>",
+            parse_mode="HTML",
         )
-        return WAIT_PHOTO
-    
-    # Если callback_data неизвестен
+
+        logger.info(f"User {user.id} confirmed invoice upload")
+
+        # Here would be the code to send the invoice to Syrve
+        # For now, we'll just acknowledge the confirmation
+
+    elif callback_data == "reject_invoice":
+        await query.edit_message_text(
+            query.message.text + "\n\n❌ <b>Отклонено пользователем.</b>",
+            parse_mode="HTML",
+        )
+
+        logger.info(f"User {user.id} rejected invoice upload")
+
     else:
-        logger.warning("Unknown callback_data: %s", query.data)
-        await query.edit_message_text(
-            "❌ Неизвестная команда. Пожалуйста, отправьте фото накладной."
-        )
-        return WAIT_PHOTO
-
-
-def format_invoice_preview(invoice_data: dict) -> str:
-    """
-    Форматирует превью накладной для отображения пользователю.
-
-    Args:
-        invoice_data: Данные накладной
-
-    Returns:
-        str: Отформатированное превью
-    """
-    supplier = invoice_data.get("supplier", "Неизвестный поставщик")
-    total = invoice_data.get("total", 0)
-    
-    # Формируем заголовок
-    preview = f"Поставщик: {supplier}\n"
-    preview += "-" * 41 + "\n"
-    
-    # Добавляем строки товаров
-    for i, item in enumerate(invoice_data.get("lines", [])):
-        name = item.get("name", "Неизвестный товар")
-        qty = item.get("qty", 0)
-        unit = item.get("unit", "")
-        price = item.get("price", 0)
-        
-        # Форматируем строку товара
-        line_num = i + 1
-        item_total = qty * price
-        
-        # Используем ljust для выравнивания колонок
-        name_field = name[:15].ljust(15)  # Ограничиваем длину названия
-        qty_field = f"{qty:.2f} {unit}".ljust(10)
-        price_field = f"{price}"
-        
-        line = f"{line_num}. {name_field} {qty_field} × {price_field} = {item_total:.2f}\n"
-        preview += line
-    
-    # Добавляем итоговую сумму
-    preview += f"\nИтого по накладной: {total:.2f} ₽"
-    
-    return preview
+        logger.warning(f"Unknown callback data: {callback_data}")
