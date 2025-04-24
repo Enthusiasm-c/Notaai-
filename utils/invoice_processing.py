@@ -1,7 +1,8 @@
 """
 Модуль для обработки данных накладной.
-"""
 
+Содержит функции для форматирования, сопоставления товаров и обогащения данных накладных.
+"""
 import dataclasses
 import datetime
 import logging
@@ -238,76 +239,86 @@ async def match_invoice_items(invoice_data) -> Dict:
     return matched_data
 
 
-async def enrich_invoice(invoice_data: Dict[str, Any]) -> Dict[str, Any]:
+async def enrich_invoice(parsed_invoice: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Обогащает данные накладной дополнительной информацией.
+    Обогащает данные накладной, сопоставляя с базой данных товаров
+    и добавляя дополнительную информацию.
     
     Args:
-        invoice_data: Исходные данные накладной
-        
+        parsed_invoice: Словарь с данными накладной после OCR
+    
     Returns:
-        dict: Обогащенные данные накладной
+        Dict[str, Any]: Обогащенные данные накладной
     """
     from utils.match import match_products
     
-    # Создаем копию входных данных
-    enriched_data = invoice_data.copy()
+    # Создаем копию исходных данных
+    enriched = parsed_invoice.copy()
     
-    # Обогащаем каждый товар в накладной
-    items = enriched_data.get("items", [])
-    enriched_items = []
+    # Поле для хранения обогащенных товаров
+    items_enriched = []
     
-    for item in items:
-        # Получаем данные товара
-        name = item.get("name", "")
+    # Обрабатываем каждый товар в накладной
+    for item in parsed_invoice.get("items", []):
+        # Получаем название товара для сопоставления
+        item_name = item.get("name", "")
         
-        # Сопоставляем с продуктами
-        product_match = await match_products(name)
+        if not item_name:
+            items_enriched.append(item.copy())
+            continue
         
-        # Обогащаем товар данными о продукте
+        # Создаем копию товара для обогащения
         enriched_item = item.copy()
         
-        if product_match and len(product_match) >= 3:
-            product_id, score, product_info = product_match
+        # Сопоставляем с товарами в базе данных
+        match_result = await match_products(item_name)
+        
+        if match_result:
+            # Извлекаем данные сопоставления
+            product_id, score, product_data = match_result
             
+            # Добавляем данные сопоставления
             enriched_item["product_id"] = product_id
             enriched_item["match_score"] = score
             
-            # Добавляем дополнительную информацию о продукте
-            if product_info:
-                for key, value in product_info.items():
+            # Добавляем данные о товаре из базы
+            if product_data:
+                for key, value in product_data.items():
                     if key not in enriched_item:
                         enriched_item[key] = value
         
-        enriched_items.append(enriched_item)
+        # Добавляем обогащенный товар в список
+        items_enriched.append(enriched_item)
     
-    # Обновляем список товаров
-    enriched_data["items"] = enriched_items
+    # Заменяем список товаров обогащенными
+    enriched["items"] = items_enriched
     
-    # Добавляем дополнительную информацию
-    enriched_data["processed_at"] = datetime.datetime.now().isoformat()
-    enriched_data["is_enriched"] = True
+    # Добавляем метаданные
+    enriched["enriched_at"] = datetime.datetime.now().isoformat()
+    enriched["items_count"] = len(items_enriched)
+    enriched["items_matched"] = sum(1 for item in items_enriched if "product_id" in item and item["product_id"])
     
-    return enriched_data
+    return enriched
 
 
 def format_invoice_for_display(invoice_dict: Dict) -> str:
     """
-    Форматирует данные накладной для отображения в Telegram.
-    
+    Преобразует результат match_invoice_items (словарь) в читабельный
+    текст для Telegram: шапка, таблица строк, итог.
+
     Args:
-        invoice_dict: Словарь с данными накладной
-        
+        invoice_dict: Словарь данных накладной
+
     Returns:
-        str: Отформатированный текст накладной
+        str: Отформатированная строка для отображения
     """
     # Извлекаем основные данные
-    vendor = invoice_dict.get("vendor_name", "Неизвестный поставщик")
+    vendor_name = invoice_dict.get("vendor_name", "Неизвестный поставщик")
     date = invoice_dict.get("date", datetime.datetime.now().strftime("%Y-%m-%d"))
-    total = invoice_dict.get("total_amount", 0)
+    total_amount = invoice_dict.get("total_amount", 0)
     items = invoice_dict.get("items", [])
     
-    # Форматируем дату
+    # Форматируем дату (если задана как строка в формате YYYY-MM-DD)
     try:
         date_obj = datetime.datetime.strptime(date, "%Y-%m-%d")
         formatted_date = date_obj.strftime("%d.%m.%Y")
@@ -317,7 +328,7 @@ def format_invoice_for_display(invoice_dict: Dict) -> str:
     # Формируем заголовок
     result = [
         "📄 <b>Накладная</b>",
-        f"<b>Поставщик:</b> {vendor}",
+        f"<b>Поставщик:</b> {vendor_name}",
         f"<b>Дата:</b> {formatted_date}",
         ""
     ]
@@ -332,7 +343,7 @@ def format_invoice_for_display(invoice_dict: Dict) -> str:
         price = item.get("price", 0)
         total_item = quantity * price
         
-        # Ограничиваем длину названия
+        # Ограничиваем длину названия (не более 22 символов)
         display_name = name
         if len(name) > 22:
             display_name = name[:22] + "..."
@@ -340,7 +351,7 @@ def format_invoice_for_display(invoice_dict: Dict) -> str:
         # Форматируем строку товара
         item_line = f"{i}. {display_name} - {quantity} {unit} × {price:.2f} = {total_item:.2f} руб."
         
-        # Добавляем информацию о сопоставлении
+        # Добавляем маркер сопоставления, если товар найден в базе
         if "product_id" in item and item["product_id"]:
             item_line += " ✓"
         
@@ -348,7 +359,7 @@ def format_invoice_for_display(invoice_dict: Dict) -> str:
     
     # Добавляем итоговую сумму
     result.append("")
-    result.append(f"<b>Итого:</b> {total:.2f} руб.")
+    result.append(f"<b>Итого:</b> {total_amount:.2f} руб.")
     
     return "\n".join(result)
 
