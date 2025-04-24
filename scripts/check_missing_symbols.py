@@ -9,9 +9,9 @@
 """
 
 from __future__ import annotations
+
 import ast
 import importlib
-import pkgutil
 import sys
 from pathlib import Path
 from typing import DefaultDict, List
@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT))           # чтобы импортировать 
 IGNORE_MODULES: set[str] = set()
 
 errors: DefaultDict[str, List[str]] = DefaultDict(list)
+
 
 def check_file(path: Path) -> None:
     tree = ast.parse(path.read_text("utf-8"), filename=str(path))
@@ -45,6 +46,7 @@ def check_file(path: Path) -> None:
                     errors[f"{path}:{node.lineno}"].append(
                         f"{mod_name}.{alias.name} not found"
                     )
+
 
 def main() -> None:
     for py in ROOT.rglob("*.py"):
