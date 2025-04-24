@@ -3,7 +3,6 @@ import logging
 import tempfile
 from dataclasses import asdict
 from pathlib import Path
-from typing import Dict, Any
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
