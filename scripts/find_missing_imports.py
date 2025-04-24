@@ -1,5 +1,7 @@
-# scripts/find_missing_imports.py
-import ast, pathlib, importlib.util, sys
+import ast
+import importlib.util
+import pathlib
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]   # корень репо
 sys.path.insert(0, str(ROOT))                        # чтобы находить local-пакеты
