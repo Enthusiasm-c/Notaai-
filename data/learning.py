@@ -6,13 +6,13 @@ from typing import Dict, Optional
 # Set up logging
 logger = logging.getLogger(__name__)
 
+# In-memory cache - инициализируем в начале файла до первого использования
+learned_mappings: Dict[str, str] = {}
+unit_conversions: Dict[str, Dict[str, float]] = {}
+
 # Paths to storage files
 MAPPINGS_FILE = os.path.join("data", "learned_mappings.json")
 UNITS_FILE = os.path.join("data", "unit_conversions.json")
-
-# In-memory cache
-learned_mappings: Dict[str, str] = {}
-unit_conversions: Dict[str, Dict[str, float]] = {}
 
 
 def load_learned_mappings() -> Dict[str, str]:
