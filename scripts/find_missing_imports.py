@@ -3,6 +3,12 @@ import importlib.util
 import pathlib
 import sys
 
+# ───────── модули, которые можно пропустить ─────────
+IGNORE = {
+    "msvcrt", "winreg", "_manylinux", "StringIO", "urllib2",
+    "htmlentitydefs", "Queue", "imp", "java", "IPython", "tokenize_rt",
+}
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]   # корень репо
 sys.path.insert(0, str(ROOT))                        # чтобы находить local-пакеты
 
