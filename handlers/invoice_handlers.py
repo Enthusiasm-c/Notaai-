@@ -1,3 +1,7 @@
+"""
+Модуль обработки накладных в формате изображений или PDF.
+"""
+
 import json
 import logging
 import tempfile
@@ -12,6 +16,8 @@ from utils.configuration import Config
 from utils.error_handling import log_error, save_error_image
 from utils.invoice_processing import format_invoice_for_display, match_invoice_items
 from utils.storage import save_temp_file
+
+__all__ = ["handle_invoice", "handle_invoice_callback"]
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -118,7 +124,7 @@ async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
 
 
-async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_invoice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle callback queries from invoice confirmation buttons
 
