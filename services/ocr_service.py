@@ -13,6 +13,9 @@ from openai import AsyncOpenAI
 # Настройка логирования
 logger = logging.getLogger(__name__)
 
+# Константа для модели OpenAI Vision
+VISION_MODEL = os.getenv("OPENAI_VISION_MODEL", "gpt-4o")
+
 
 @dataclass
 class ParsedInvoice:
@@ -41,7 +44,7 @@ async def extract(photo_path: str) -> Optional[ParsedInvoice]:
             
         # Если путь к файлу передан как строка
         if isinstance(photo_path, str):
-            logger.info(f"Reading image from path: {photo_path}")
+            logger.info("Reading image from path: %s", photo_path)
             with open(photo_path, "rb") as image_file:
                 image_data = image_file.read()
         else:
@@ -62,7 +65,7 @@ async def extract(photo_path: str) -> Optional[ParsedInvoice]:
         return convert_to_parsed_invoice(result)
         
     except Exception as e:
-        logger.error(f"Error extracting data from invoice: {e}", exc_info=True)
+        logger.error("Error extracting data from invoice: %s", e, exc_info=True)
         return None
 
 
@@ -101,9 +104,9 @@ async def process_image_with_openai(api_key: str, image_data: bytes) -> Optional
         """
         
         # Вызываем API
-        logger.info("Sending image to OpenAI for processing")
+        logger.info("Sending image to OpenAI for processing using model: %s", VISION_MODEL)
         response = await client.chat.completions.create(
-            model="gpt-4-vision-preview",
+            model=VISION_MODEL,
             messages=[
                 {
                     "role": "user",
@@ -116,7 +119,7 @@ async def process_image_with_openai(api_key: str, image_data: bytes) -> Optional
                     ]
                 }
             ],
-            max_tokens=4000,
+            max_tokens=4096,
             response_format={"type": "json_object"}
         )
         
@@ -130,14 +133,14 @@ async def process_image_with_openai(api_key: str, image_data: bytes) -> Optional
         import json
         try:
             result = json.loads(content)
-            logger.info(f"Successfully extracted data: {len(result.get('items', []))} items found")
+            logger.info("Successfully extracted data: %d items found", len(result.get("items", [])))
             return result
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse OpenAI response as JSON: {e}")
+            logger.error("Failed to parse OpenAI response as JSON: %s", e)
             return None
             
     except Exception as e:
-        logger.error(f"Error processing image with OpenAI: {e}", exc_info=True)
+        logger.error("Error processing image with OpenAI: %s", e, exc_info=True)
         return None
 
 
