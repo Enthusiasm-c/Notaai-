@@ -13,6 +13,16 @@ from utils.learning import load_unit_conversions
 # Получаем логгер
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "apply_unit_conversions",
+    "format_invoice_data",
+    "format_final_invoice",
+    "match_invoice_items",
+    "enrich_invoice",
+    "format_invoice_for_display",
+    "check_product_exists",
+]
+
 
 def apply_unit_conversions(matched_data: Dict) -> List[Dict]:
     """
@@ -255,48 +265,19 @@ async def enrich_invoice(parsed_invoice: Dict[str, Any]) -> Dict[str, Any]:
     # Создаем копию исходных данных
     enriched = parsed_invoice.copy()
     
-    # Поле для хранения обогащенных товаров
-    items_enriched = []
+    # Получаем список товаров для сопоставления
+    items = parsed_invoice.get("items", [])
     
-    # Обрабатываем каждый товар в накладной
-    for item in parsed_invoice.get("items", []):
-        # Получаем название товара для сопоставления
-        item_name = item.get("name", "")
-        
-        if not item_name:
-            items_enriched.append(item.copy())
-            continue
-        
-        # Создаем копию товара для обогащения
-        enriched_item = item.copy()
-        
-        # Сопоставляем с товарами в базе данных
-        match_result = await match_products(item_name)
-        
-        if match_result:
-            # Извлекаем данные сопоставления
-            product_id, score, product_data = match_result
-            
-            # Добавляем данные сопоставления
-            enriched_item["product_id"] = product_id
-            enriched_item["match_score"] = score
-            
-            # Добавляем данные о товаре из базы
-            if product_data:
-                for key, value in product_data.items():
-                    if key not in enriched_item:
-                        enriched_item[key] = value
-        
-        # Добавляем обогащенный товар в список
-        items_enriched.append(enriched_item)
+    # Сопоставляем товары с базой данных
+    enriched_items = await match_products(items)
     
     # Заменяем список товаров обогащенными
-    enriched["items"] = items_enriched
+    enriched["items"] = enriched_items
     
     # Добавляем метаданные
     enriched["enriched_at"] = datetime.datetime.now().isoformat()
-    enriched["items_count"] = len(items_enriched)
-    enriched["items_matched"] = sum(1 for item in items_enriched if "product_id" in item and item["product_id"])
+    enriched["items_count"] = len(enriched_items)
+    enriched["items_matched"] = sum(1 for item in enriched_items if "product_id" in item and item["product_id"])
     
     return enriched
 
