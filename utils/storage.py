@@ -1,31 +1,32 @@
-"""
-Функции для временного сохранения загруженных пользователями файлов.
-"""
-
+# utils/storage.py
 from __future__ import annotations
+import os
+import re
 import tempfile
 from pathlib import Path
-from typing import BinaryIO
+from typing import Union
 
+TEMP_DIR = Path("/tmp/notaai/temp")
+TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-def save_temp_file(file_obj: BinaryIO, suffix: str = "") -> Path:
+_NUL_RE = re.compile(r"\x00")
+
+def _sanitize(component: str) -> str:
+    """Удаляет NUL-байты и недопустимые символы из имени файла/суфикса."""
+    component = _NUL_RE.sub("", component)
+    return component.replace(os.sep, "_")
+
+def save_temp_file(user_id: Union[int, str], data: bytes, *, suffix: str = ".bin") -> str:
     """
-    Сохраняет объект file-like (bytes, BufferedReader…) во временный файл и
-    возвращает pathlib.Path к нему.
-
-    Parameters
-    ----------
-    file_obj : BinaryIO
-        Поток байтов (например, `bot.get_file(...).download_as_bytearray()`).
-    suffix : str, optional
-        Дополнительное расширение, например ".jpg" или ".pdf".
-
-    Returns
-    -------
-    pathlib.Path
-        Путь к созданному файлу во временной директории.
+    Сохраняет бинарные данные во временный файл и
+    возвращает абсолютный путь.
     """
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-    tmp.write(file_obj.read() if hasattr(file_obj, "read") else file_obj)
+    clean_suffix = _sanitize(suffix) or ".bin"
+    tmp = tempfile.NamedTemporaryFile(
+        dir=TEMP_DIR,
+        suffix=clean_suffix,
+        delete=False,
+    )
+    tmp.write(data)
     tmp.close()
-    return Path(tmp.name)
+    return tmp.name
