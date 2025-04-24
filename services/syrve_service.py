@@ -1,6 +1,4 @@
-"""
-Service for interacting with Syrve ERP API
-"""
+"""Service for interacting with Syrve ERP API"""
 
 import datetime
 import logging
@@ -10,6 +8,8 @@ import requests
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+__all__ = ["SyrveService", "authenticate", "commit_document", "send_invoice_to_syrve"]
 
 
 class SyrveService:
@@ -155,7 +155,52 @@ class SyrveService:
         return syrve_invoice
 
 
-# --- Proxy for backward-compatibility ------------------------------------
-async def create_invoice(invoice_data: Dict[str, Any]) -> Optional[str]:
-    """Proxy-функция, вызывает SyrveService.create_invoice()."""
-    return await SyrveService().create_invoice(invoice_data)
+async def authenticate(login: str, password: str, base_url: str) -> bool:
+    """
+    Standalone function to authenticate with Syrve API
+    
+    Args:
+        login: Syrve API login
+        password: Syrve API password
+        base_url: Base URL for Syrve API
+        
+    Returns:
+        bool: True if authentication successful
+    """
+    service = SyrveService(login, password, base_url)
+    return await service.authenticate()
+
+
+async def commit_document(document_id: str, token: str, base_url: str) -> bool:
+    """
+    Commit a document in Syrve API
+    
+    Args:
+        document_id: ID of the document to commit
+        token: Authentication token
+        base_url: Base URL for Syrve API
+        
+    Returns:
+        bool: True if commit successful
+    """
+    logger.info(f"Committing document with ID: {document_id}")
+    # Implementation would go here
+    pass
+
+
+async def send_invoice_to_syrve(invoice_data: Dict[str, Any], login: str, password: str, base_url: str) -> Optional[str]:
+    """
+    Send invoice data to Syrve API
+    
+    Args:
+        invoice_data: Invoice data to send
+        login: Syrve API login
+        password: Syrve API password
+        base_url: Base URL for Syrve API
+        
+    Returns:
+        str: Document ID if successful, None otherwise
+    """
+    logger.info("Sending invoice to Syrve")
+    service = SyrveService(login, password, base_url)
+    return await service.create_invoice(invoice_data)
