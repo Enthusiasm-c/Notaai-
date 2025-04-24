@@ -14,11 +14,11 @@ from utils.learning import load_unit_conversions
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "enrich_invoice",
     "apply_unit_conversions",
     "format_invoice_data",
     "format_final_invoice",
     "match_invoice_items",
-    "enrich_invoice",
     "format_invoice_for_display",
     "check_product_exists",
 ]
