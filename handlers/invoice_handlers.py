@@ -7,10 +7,10 @@ from pathlib import Path
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from services.ocr_service import OCRService
+from services.ocr_service import extract
 from utils.configuration import Config
 from utils.error_handling import log_error, save_error_image
-from utils.invoice_processing import ParsedInvoice, format_invoice_for_display, match_invoice_items
+from utils.invoice_processing import format_invoice_for_display, match_invoice_items
 from utils.storage import save_temp_file
 
 # Set up logging
@@ -65,21 +65,9 @@ async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         # Process the image with OCR
         config = Config()
-        ocr_service = OCRService(api_key=config.OPENAI_API_KEY, model=config.OPENAI_MODEL)
-
-        with open(temp_path, "rb") as f:
-            image_data = f.read()
-
-        # Process the image
-        raw_data = await ocr_service.process_image(image_data)
-
-        # Create a ParsedInvoice from the OCR output
-        invoice_data = ParsedInvoice(
-            date=raw_data.get("date", ""),
-            vendor_name=raw_data.get("vendor_name", ""),
-            total_amount=raw_data.get("total_amount", 0),
-            lines=raw_data.get("items", [])
-        )
+        
+        # Extract invoice data using OCR
+        invoice_data = await extract(temp_path)
 
         # Log the OCR result
         logger.info(f"OCR result: {json.dumps(asdict(invoice_data), ensure_ascii=False)[:500]}...")
@@ -103,6 +91,9 @@ async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.user_data["invoice"] = enriched_data
 
         # Save the image to temporary storage
+        with open(temp_path, "rb") as f:
+            image_data = f.read()
+            
         file_key = save_temp_file(user.id, image_data)
         context.user_data["invoice_image_key"] = file_key
 
