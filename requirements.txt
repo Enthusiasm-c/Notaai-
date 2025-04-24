@@ -3,3 +3,4 @@ openai>=1.3.0
 aiohttp>=3.8.5
 pandas>=2.0.0
 requests
+pydantic-settings>=2.0.0
