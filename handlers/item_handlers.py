@@ -1,3 +1,7 @@
+"""
+Обработчики для работы с товарами в накладных.
+"""
+
 import asyncio
 import datetime
 import json
@@ -10,16 +14,17 @@ from config import (
     ADD_NEW_ITEM,
     CONFIRMATION,
     EDIT_ITEM,
+    FINAL_CONFIRMATION,
     SELECT_EDIT_ITEM,
     SET_CONVERSION,
     WAIT_PHOTO,
     user_data,
 )
-from data.learning import save_learned_mapping, save_unit_conversion
 from utils.error_handling import log_error
-from utils.invoice_processing import check_product_exists, format_invoice_data
+from utils.invoice_processing import check_product_exists, format_invoice_for_display
+from utils.learning import save_learned_mapping, save_unit_conversion
 
-# Получаем логгер
+# Настройка логирования
 logger = logging.getLogger(__name__)
 
 
@@ -38,9 +43,9 @@ async def display_item_selection(query, user_id):
     # Создаем клавиатуру со списком товаров
     keyboard = []
 
-    for i, line in enumerate(matched_data.get("lines", [])):
-        line_num = line.get("line", i + 1)
-        name = line.get("name", "Unknown item")
+    for i, item_line in enumerate(matched_data.get("lines", [])):
+        line_num = item_line.get("line", i + 1)
+        name = item_line.get("name", "Unknown item")
 
         # Добавляем информацию о товаре
         if len(name) > 30:
@@ -89,7 +94,7 @@ async def handle_item_selection(update: Update, context: ContextTypes.DEFAULT_TY
 
         if query.data == "back_to_main":
             # Возвращаемся к основному экрану
-            message_text = format_invoice_data(user_data[user_id])
+            message_text = format_invoice_for_display(user_data[user_id])
 
             # Создаем клавиатуру для действий
             keyboard = []
@@ -343,7 +348,7 @@ async def handle_item_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             matched_data["lines"][item_index]["match_score"] = 1.0  # Идеальное совпадение
 
             # Сохраняем сопоставление
-            save_learned_mapping(item_name, new_product_id, item_name)
+            save_learned_mapping(item_name, new_product_id)
 
             await query.edit_message_text(
                 text=f"✅ Item '{item_name}' added as new and saved for future recognition."
@@ -451,7 +456,7 @@ async def handle_item_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
         # Возврат к основному экрану
         elif query.data == "back_to_main":
-            message_text = format_invoice_data(user_data[user_id])
+            message_text = format_invoice_for_display(user_data[user_id])
 
             # Создаем клавиатуру для действий
             keyboard = []
@@ -551,7 +556,7 @@ async def handle_manual_item_entry(update: Update, context: ContextTypes.DEFAULT
             user_data[user_id]["matched_data"]["lines"][item_index]["manual_name"] = entered_name
 
             # Сохраняем это сопоставление для будущего использования
-            save_learned_mapping(original_name, product_id, entered_name)
+            save_learned_mapping(original_name, product_id)
 
             await update.message.reply_text(
                 f"✅ Found product '{entered_name}' in database!\n\n"
@@ -740,7 +745,7 @@ async def handle_manual_entry_callback(update: Update, context: ContextTypes.DEF
             user_data[user_id]["matched_data"]["lines"][item_index]["manual_name"] = entered_name
 
             # Сохраняем сопоставление
-            save_learned_mapping(original_name, new_product_id, entered_name)
+            save_learned_mapping(original_name, new_product_id)
 
             await query.edit_message_text(
                 f"✅ Item '{entered_name}' added as new and saved for future recognition."
@@ -904,8 +909,6 @@ async def handle_conversion_entry(update: Update, context: ContextTypes.DEFAULT_
 
                 # Сохраняем конвертацию в базу данных
                 save_unit_conversion(
-                    product_id,
-                    product_name,
                     source_unit,
                     target_unit,
                     conversion_factor,
