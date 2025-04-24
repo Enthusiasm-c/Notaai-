@@ -20,3 +20,7 @@ claude_*.zip
 lint_*.txt
 missing_*.txt
 runtime_*.txt
+
+# игнорируем байткод
+*.pyc
+__pycache__/
