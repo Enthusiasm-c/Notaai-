@@ -1,26 +1,15 @@
 """
 Конфигурация и константы для работы бота NotaAI.
+
+Включает состояния диалога и настройки приложения, читаемые из переменных окружения.
 """
 import logging
 import sys
-
-try:                            # Pydantic 2 way
-    from pydantic_settings import BaseSettings, SettingsConfigDict
-except ModuleNotFoundError:     # Fallback for old images / Pydantic 1
-    from pydantic import BaseSettings  # type: ignore
-    SettingsConfigDict = dict        # dummy alias
-
-from pydantic import Field          # Field доступен в обеих версиях
 from enum import IntEnum, auto
 from pathlib import Path
 
-
-try:
-    from pydantic_settings import BaseSettings, SettingsConfigDict
-except ModuleNotFoundError:
-    from pydantic import BaseSettings  # type: ignore
-    SettingsConfigDict = dict
 from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 # Настройка логирования
@@ -42,30 +31,26 @@ class BotState(IntEnum):
     FINAL_CONFIRMATION = auto()
 
 
-# Защита от циклического импорта
-_self = sys.modules[__name__]
-for _name in BotState.__members__:
-    setattr(_self, _name, BotState[_name])
-del _self, _name
+# Экспортируем BotState как отдельные константы
+_m = sys.modules[__name__]
+for _n, _v in BotState.__members__.items():
+    setattr(_m, _n, _v)
+del _m, _n, _v
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=None)
-    TELEGRAM_TOKEN: str = Field(..., env='TELEGRAM_TOKEN')
-    OPENAI_API_KEY: str = Field(..., env='OPENAI_API_KEY')
-    OPENAI_MODEL: str = Field('gpt-4o', env='OPENAI_MODEL')
-    SYRVE_LOGIN: str = Field('', env='SYRVE_LOGIN')
-    SYRVE_PASSWORD: str = Field('', env='SYRVE_PASSWORD')
-    SYRVE_BASE_URL: str = Field('https://api.syrve.com/api/v2', env='SYRVE_BASE_URL')
-    REDIS_URL: str = Field('redis://redis:6379/0', env='REDIS_URL')
+    model_config = SettingsConfigDict(env_file=None, case_sensitive=True)
+    
+    TELEGRAM_TOKEN: str = Field(..., description="Telegram Bot API Token")
+    OPENAI_API_KEY: str = Field(..., description="OpenAI API Key")
+    OPENAI_MODEL: str = Field("gpt-4o", description="OpenAI Model to use")
+    
+    SYRVE_LOGIN: str = Field("", description="Syrve API Login")
+    SYRVE_PASSWORD: str = Field("", description="Syrve API Password")
+    SYRVE_BASE_URL: str = Field("https://api.syrve.com/api/v2", description="Syrve API Base URL")
+    
+    REDIS_URL: str = Field("redis://redis:6379/0", description="Redis Connection URL")
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-
-
-# Словарь для хранения данных пользователей
-user_data = {}  # dict[int, dict]
 
 # Инициализация настроек
 try:
@@ -73,9 +58,13 @@ try:
 except Exception as e:
     raise ValueError(f"Configuration error: {e}") from e
 
+
+# Словарь для хранения данных пользователей
+user_data = {}  # dict[int, dict]
+
 # Пути к файлам данных
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 
 
-__all__ = list(BotState.__members__) + ["BotState", "settings", "user_data", "BASE_DIR", "DATA_DIR"]
+__all__ = ['settings', 'BotState', 'user_data', 'BASE_DIR', 'DATA_DIR'] + list(BotState.__members__)
