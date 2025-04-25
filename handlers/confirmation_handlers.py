@@ -4,7 +4,6 @@
 
 import logging
 import math
-from typing import List, Dict
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
