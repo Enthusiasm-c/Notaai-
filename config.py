@@ -1,16 +1,20 @@
 """
 Конфигурация и константы для работы бота NotaAI.
 """
-import os
 import logging
+import sys
 from enum import IntEnum, auto
 from pathlib import Path
+
+from pydantic import BaseSettings, Field
+
 
 # Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
 )
+
 
 # Состояния диалога
 class BotState(IntEnum):
@@ -23,15 +27,13 @@ class BotState(IntEnum):
     SET_CONVERSION = auto()
     FINAL_CONFIRMATION = auto()
 
+
 # Защита от циклического импорта
-import sys as _sys
-_self = _sys.modules[__name__]
+_self = sys.modules[__name__]
 for _name in BotState.__members__:
     setattr(_self, _name, BotState[_name])
-del _sys, _self, _name
+del _self, _name
 
-# Валидация переменных окружения
-from pydantic import BaseSettings, Field
 
 class Settings(BaseSettings):
     TELEGRAM_TOKEN: str = Field(..., env='TELEGRAM_TOKEN')
@@ -46,6 +48,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
 
+
 # Словарь для хранения данных пользователей
 user_data = {}  # dict[int, dict]
 
@@ -58,5 +61,6 @@ except Exception as e:
 # Пути к файлам данных
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
+
 
 __all__ = list(BotState.__members__) + ["BotState", "settings", "user_data", "BASE_DIR", "DATA_DIR"]
