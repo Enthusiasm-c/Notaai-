@@ -1,59 +1,58 @@
 """
-Обработчики для работы с накладными в Telegram-боте.
+Handlers for working with invoices in the Telegram bot.
 
-Модуль содержит функции для обработки фото накладных и колбэков их подтверждения.
+This module contains functions for processing invoice photos and their confirmation callbacks.
 """
 
 import json
 import logging
 import tempfile
-import inspect 
 from dataclasses import asdict
 from pathlib import Path
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from config import CONFIRMATION, WAIT_PHOTO
+from config import CONFIRMATION, WAIT_PHOTO, FIX_ITEM
 from services.ocr_service import extract
+from services.syrve_service import commit_document
 from utils.configuration import Config
 from utils.error_handling import log_error, save_error_image
-from utils.invoice_processing import enrich_invoice, format_invoice_for_display
+from utils.invoice_processing import enrich_invoice, format_invoice_for_display, ensure_result
 from utils.storage import save_temp_file
-from utils.async_tools import ensure_result
 
-__all__ = ["handle_invoice", "handle_invoice_callback"]
+__all__ = ["handle_invoice", "handle_invoice_callback", "handle_fix_item_callback"]
 
-# Настройка логирования
+# Logging setup
 logger = logging.getLogger(__name__)
 
 
 async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
-    Обработчик получения фотографий накладных.
+    Handler for receiving invoice photos.
     
     Args:
-        update: Объект Update от Telegram
-        context: Контекст бота
+        update: Telegram Update object
+        context: Bot context
         
     Returns:
-        int: Следующее состояние диалога
+        int: Next dialog state
     """
     try:
         user = update.effective_user
-        logger.info(f"Получена фотография накладной от пользователя {user.id} ({user.username})")
+        logger.info(f"Received invoice photo from user {user.id} ({user.username})")
         
-        # Отправляем сообщение о начале обработки
+        # Send processing message
         processing_message = await update.message.reply_text(
-            "⏳ Обрабатываю документ... Это может занять до 30 секунд."
+            "⏳ Processing document... This may take up to 30 seconds."
         )
         
-        # Получаем ID файла
+        # Get file ID
         file_id = None
         file_type = None
         
         if update.message.photo:
-            # Берем последнее (самое крупное) фото
+            # Take the last (largest) photo
             file_id = update.message.photo[-1].file_id
             file_type = "photo"
         elif update.message.document and update.message.document.mime_type == "application/pdf":
@@ -61,60 +60,87 @@ async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             file_type = "document"
         else:
             await update.message.reply_text(
-                "❌ Пожалуйста, отправьте фото накладной или PDF-документ."
+                "❌ Please send an invoice photo or PDF document."
             )
             return WAIT_PHOTO
         
-        # Скачиваем файл
+        # Download file
         file = await context.bot.get_file(file_id)
         
-        # Создаем временную директорию, если она не существует
+        # Create temp directory if it doesn't exist
         temp_dir = Path("/tmp") / "notaai"
         temp_dir.mkdir(parents=True, exist_ok=True)
         
-        # Создаем временный файл
+        # Create temp file
         with tempfile.NamedTemporaryFile(delete=False, dir=temp_dir, suffix=".jpg") as temp_file:
             temp_path = temp_file.name
             await file.download_to_drive(temp_path)
         
-        # Обрабатываем изображение с помощью OCR
+        # Process image with OCR
         config = Config()
         
-        # Извлекаем данные накладной
+        # Extract invoice data
         invoice_data = await extract(temp_path)
         
-        # Логируем результат OCR
+        # Log OCR result
         logger.info(f"OCR result: {json.dumps(asdict(invoice_data), ensure_ascii=False)[:500]}...")
         
-        # Сопоставляем товары из накладной с базой данных
+        # Match invoice items with database
         raw = await enrich_invoice(asdict(invoice_data))
-        enriched_data = await ensure_result(raw)   # ← гарантируем dict
+        invoice_data = await ensure_result(raw)
         
-        # Форматируем данные накладной для отображения
-        formatted_message = format_invoice_for_display(enriched_data)
+        # Format invoice data for display
+        formatted_message = format_invoice_for_display(invoice_data)
         
-        # Создаем клавиатуру для подтверждения
-        keyboard = [
-            [
-                InlineKeyboardButton("✅ Подтвердить", callback_data="confirm_invoice"),
-                InlineKeyboardButton("❌ Отклонить", callback_data="reject_invoice"),
-            ]
+        # Create keyboard with fixes for unmatched items
+        keyboard = []
+        
+        # Add fix buttons for unmatched items
+        unmatched_items = [
+            item for item in invoice_data.get("items", [])
+            if item.get("match_status") == "unmatched"
         ]
+        
+        fix_buttons = []
+        for i, item in enumerate(unmatched_items):
+            item_index = invoice_data["items"].index(item)
+            fix_buttons.append(
+                InlineKeyboardButton(f"Fix_{item_index+1}", callback_data=f"fix_item_{item_index}")
+            )
+            
+            # Create rows with 3 buttons each
+            if len(fix_buttons) == 3 or i == len(unmatched_items) - 1:
+                keyboard.append(fix_buttons)
+                fix_buttons = []
+        
+        # Add confirm button if there are matched items
+        matched_count = invoice_data.get("matched_count", 0)
+        if matched_count > 0:
+            keyboard.append([
+                InlineKeyboardButton("Confirm matched", callback_data="confirm_invoice"),
+            ])
+        
+        # If no unmatched items, add "Send to Syrve" button
+        if len(unmatched_items) == 0:
+            keyboard.append([
+                InlineKeyboardButton("📤 Send to Syrve", callback_data="send_to_syrve"),
+            ])
+        
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # Сохраняем данные накладной в контексте пользователя
-        context.user_data["invoice"] = enriched_data
+        # Save invoice data in user context
+        context.user_data["invoice"] = invoice_data
         
-        # Сохраняем изображение во временное хранилище
+        # Save image to temporary storage
         with open(temp_path, "rb") as f:
             image_data = f.read()
         
         file_key = save_temp_file(user.id, image_data)
         context.user_data["invoice_image_key"] = file_key
         
-        # Редактируем сообщение о обработке
+        # Edit processing message
         await processing_message.edit_text(
-            formatted_message + "\n\n<i>Проверьте данные и подтвердите отправку.</i>",
+            formatted_message + "\n\n<i>Review the data and confirm matched items or fix unmatched ones.</i>",
             reply_markup=reply_markup,
             parse_mode="HTML",
         )
@@ -122,16 +148,16 @@ async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return CONFIRMATION
     
     except Exception as e:
-        # Логируем ошибку
+        # Log error
         log_error(f"Error processing invoice: {str(e)}", e)
         
-        # Сохраняем изображение, вызвавшее ошибку, если доступно
+        # Save error-causing image if available
         if update.message.photo and "image_data" in locals():
             save_error_image(user.id, image_data)
         
-        # Уведомляем пользователя
+        # Notify user
         await update.message.reply_text(
-            "❌ Произошла ошибка при обработке документа. Пожалуйста, попробуйте еще раз или обратитесь за помощью."
+            "❌ An error occurred while processing the document. Please try again or contact support."
         )
         
         return WAIT_PHOTO
@@ -139,40 +165,145 @@ async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def handle_invoice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
-    Обработчик колбэков для подтверждения/отклонения накладной.
+    Handler for callbacks to confirm/reject invoice.
     
     Args:
-        update: Объект Update от Telegram
-        context: Контекст бота
+        update: Telegram Update object
+        context: Bot context
         
     Returns:
-        int: Следующее состояние диалога
+        int: Next dialog state
     """
     query = update.callback_query
     user = query.from_user
     
-    # Отвечаем на колбэк, чтобы убрать индикатор загрузки
+    # Answer callback to remove loading indicator
     await query.answer()
     
-    # Получаем данные колбэка
+    # Get callback data
     callback_data = query.data
     
     if callback_data == "confirm_invoice":
-        await query.edit_message_text(
-            query.message.text + "\n\n✅ <b>Подтверждено и отправлено в Syrve!</b>",
-            parse_mode="HTML",
-        )
+        # Check if there are still unmatched items
+        invoice_data = context.user_data.get("invoice", {})
+        unmatched_count = invoice_data.get("unmatched_count", 0)
         
-        logger.info(f"User {user.id} confirmed invoice upload")
+        if unmatched_count > 0:
+            # Show confirmation with unmatched items notice
+            formatted_message = format_invoice_for_display(invoice_data)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton("📤 Send to Syrve", callback_data="send_to_syrve"),
+                    InlineKeyboardButton("⬅️ Back", callback_data="back_to_edit"),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                formatted_message + f"\n\n⚠️ <b>Warning: {unmatched_count} items still need fixing.</b>\n"
+                f"<i>Do you want to proceed with only matched items?</i>",
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+            )
+            
+            return CONFIRMATION
+        else:
+            # All items matched, show final confirmation
+            keyboard = [
+                [
+                    InlineKeyboardButton("📤 Send to Syrve", callback_data="send_to_syrve"),
+                    InlineKeyboardButton("❌ Cancel", callback_data="reject_invoice"),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                query.message.text + "\n\n✅ <b>Ready to send to Syrve!</b>",
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+            )
+            
+            return CONFIRMATION
+    
+    elif callback_data == "send_to_syrve":
+        invoice_data = context.user_data.get("invoice", {})
         
-        # Здесь в будущем будет код для отправки накладной в Syrve
-        # Пока просто подтверждаем действие
+        # Call Syrve service to commit document
+        success = await commit_document(invoice_data)
+        
+        if success:
+            await query.edit_message_text(
+                query.message.text + "\n\n✅ <b>Successfully sent to Syrve!</b>",
+                parse_mode="HTML",
+            )
+            
+            logger.info(f"User {user.id} sent invoice to Syrve")
+        else:
+            # If sending failed
+            keyboard = [
+                [
+                    InlineKeyboardButton("🔄 Retry", callback_data="send_to_syrve"),
+                    InlineKeyboardButton("❌ Cancel", callback_data="reject_invoice"),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                query.message.text + "\n\n❌ <b>Failed to send to Syrve. Please try again.</b>",
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+            )
+            
+            logger.error(f"User {user.id} failed to send invoice to Syrve")
+            return CONFIRMATION
         
         return WAIT_PHOTO
     
+    elif callback_data == "back_to_edit":
+        # Return to editing invoice
+        invoice_data = context.user_data.get("invoice", {})
+        formatted_message = format_invoice_for_display(invoice_data)
+        
+        # Recreate keyboard with fixes for unmatched items
+        keyboard = []
+        
+        # Add fix buttons for unmatched items
+        unmatched_items = [
+            item for item in invoice_data.get("items", [])
+            if item.get("match_status") == "unmatched"
+        ]
+        
+        fix_buttons = []
+        for i, item in enumerate(unmatched_items):
+            item_index = invoice_data["items"].index(item)
+            fix_buttons.append(
+                InlineKeyboardButton(f"Fix_{item_index+1}", callback_data=f"fix_item_{item_index}")
+            )
+            
+            # Create rows with 3 buttons each
+            if len(fix_buttons) == 3 or i == len(unmatched_items) - 1:
+                keyboard.append(fix_buttons)
+                fix_buttons = []
+        
+        # Add confirm button
+        keyboard.append([
+            InlineKeyboardButton("Confirm matched", callback_data="confirm_invoice"),
+        ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            formatted_message + "\n\n<i>Review the data and confirm matched items or fix unmatched ones.</i>",
+            reply_markup=reply_markup,
+            parse_mode="HTML",
+        )
+        
+        return CONFIRMATION
+    
     elif callback_data == "reject_invoice":
         await query.edit_message_text(
-            query.message.text + "\n\n❌ <b>Отклонено пользователем.</b>",
+            query.message.text + "\n\n❌ <b>Rejected by user.</b>",
             parse_mode="HTML",
         )
         
@@ -180,6 +311,204 @@ async def handle_invoice_callback(update: Update, context: ContextTypes.DEFAULT_
         
         return WAIT_PHOTO
     
+    elif callback_data.startswith("fix_item_"):
+        # Extract item index from callback data
+        item_index = int(callback_data.split("_")[-1])
+        
+        # Store item index in user data
+        context.user_data["fixing_item_index"] = item_index
+        
+        # Get invoice data
+        invoice_data = context.user_data.get("invoice", {})
+        items = invoice_data.get("items", [])
+        
+        if 0 <= item_index < len(items):
+            item = items[item_index]
+            
+            # Ask user to enter corrected information
+            await query.edit_message_text(
+                f"<b>Fixing item #{item_index+1}:</b>\n\n"
+                f"Current: {item.get('name', 'Unknown')} - "
+                f"{item.get('quantity', 0)} {item.get('unit', 'pcs')} × "
+                f"{item.get('price', 0):,.2f}\n\n"
+                f"<i>Please send a message with the corrected information in this format:</i>\n"
+                f"<code>name quantity unit price</code>\n\n"
+                f"Example: <code>Tomato 2 kg 20000</code>",
+                parse_mode="HTML",
+            )
+            
+            return FIX_ITEM
+        else:
+            logger.warning(f"Invalid item index: {item_index}")
+            return CONFIRMATION
+    
     else:
         logger.warning(f"Unknown callback data: {callback_data}")
+        return CONFIRMATION
+
+
+async def handle_fix_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Handler for fixing invoice items.
+    
+    Args:
+        update: Telegram Update object
+        context: Bot context
+        
+    Returns:
+        int: Next dialog state
+    """
+    try:
+        user = update.effective_user
+        item_index = context.user_data.get("fixing_item_index")
+        
+        if item_index is None:
+            await update.message.reply_text(
+                "❌ Error: No item selected for fixing. Please try again."
+            )
+            return WAIT_PHOTO
+        
+        # Get invoice data
+        invoice_data = context.user_data.get("invoice", {})
+        items = invoice_data.get("items", [])
+        
+        if 0 <= item_index < len(items):
+            # Parse user message
+            text = update.message.text.strip()
+            parts = text.split()
+            
+            if len(parts) < 4:
+                await update.message.reply_text(
+                    "❌ Invalid format. Please use: name quantity unit price\n"
+                    "Example: Tomato 2 kg 20000"
+                )
+                return FIX_ITEM
+            
+            # Extract price (last part)
+            try:
+                price = float(parts[-1])
+            except ValueError:
+                await update.message.reply_text(
+                    "❌ Invalid price. Please enter a number for price."
+                )
+                return FIX_ITEM
+            
+            # Extract unit (second to last part)
+            unit = parts[-2]
+            
+            # Extract quantity (third to last part)
+            try:
+                quantity = float(parts[-3])
+            except ValueError:
+                await update.message.reply_text(
+                    "❌ Invalid quantity. Please enter a number for quantity."
+                )
+                return FIX_ITEM
+            
+            # Extract name (all remaining parts at the beginning)
+            name = " ".join(parts[:-3])
+            
+            # Update item
+            items[item_index].update({
+                "name": name,
+                "quantity": quantity,
+                "unit": unit,
+                "price": price,
+                "match_status": "matched",  # Mark as manually matched
+            })
+            
+            # Re-validate and update item
+            from utils.match import match
+            product_id, score = match(name)
+            
+            if score >= 0.6 and product_id:
+                items[item_index]["product_id"] = product_id
+                items[item_index]["match_score"] = score
+            
+            # Update counts
+            matched_count = sum(1 for item in items if item.get("match_status") == "matched")
+            unmatched_count = len(items) - matched_count
+            
+            # Update total sums
+            total_qty_matched = sum(
+                item.get("quantity", 0) for item in items 
+                if item.get("match_status") == "matched"
+            )
+            total_sum_matched_idr = sum(
+                item.get("quantity", 0) * item.get("price", 0) 
+                for item in items if item.get("match_status") == "matched"
+            )
+            
+            # Update invoice data
+            invoice_data.update({
+                "items": items,
+                "matched_count": matched_count,
+                "unmatched_count": unmatched_count,
+                "total_qty_matched": total_qty_matched,
+                "total_sum_matched_idr": total_sum_matched_idr,
+            })
+            
+            # Format updated invoice
+            formatted_message = format_invoice_for_display(invoice_data)
+            
+            # Create keyboard with fixes for remaining unmatched items
+            keyboard = []
+            
+            # Add fix buttons for unmatched items
+            unmatched_items = [
+                item for item in items
+                if item.get("match_status") == "unmatched"
+            ]
+            
+            fix_buttons = []
+            for i, item in enumerate(unmatched_items):
+                item_index = items.index(item)
+                fix_buttons.append(
+                    InlineKeyboardButton(f"Fix_{item_index+1}", callback_data=f"fix_item_{item_index}")
+                )
+                
+                # Create rows with 3 buttons each
+                if len(fix_buttons) == 3 or i == len(unmatched_items) - 1:
+                    keyboard.append(fix_buttons)
+                    fix_buttons = []
+            
+            # Add confirm button
+            if matched_count > 0:
+                keyboard.append([
+                    InlineKeyboardButton("Confirm matched", callback_data="confirm_invoice"),
+                ])
+            
+            # If no unmatched items, add "Send to Syrve" button
+            if unmatched_count == 0:
+                keyboard.append([
+                    InlineKeyboardButton("📤 Send to Syrve", callback_data="send_to_syrve"),
+                ])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            # Send updated invoice to user
+            await update.message.reply_text(
+                formatted_message + "\n\n<i>Item updated. Review and confirm when ready.</i>",
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+            )
+            
+            # Update user data
+            context.user_data["invoice"] = invoice_data
+            
+            return CONFIRMATION
+        else:
+            logger.warning(f"Invalid item index: {item_index}")
+            await update.message.reply_text(
+                "❌ Error: Invalid item index. Please try again."
+            )
+            return WAIT_PHOTO
+    
+    except Exception as e:
+        log_error(f"Error fixing invoice item: {str(e)}", e)
+        
+        await update.message.reply_text(
+            "❌ An error occurred while updating the item. Please try again."
+        )
+        
         return WAIT_PHOTO
