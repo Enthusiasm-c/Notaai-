@@ -1,19 +1,40 @@
+# docker-compose.yml
+#
+# One file – both local dev and production CI.
+# Image is built **from source** every time, so you only have to
+# `git pull && docker compose up -d` on the server.
+
+version: "3.9"
+
 services:
   bot:
-    build: .
-    env_file:
-      - .env
+    # ───────── build the image ─────────
+    build:
+      context: .            # repo root
+      dockerfile: Dockerfile
+      args:
+        - PIP_NO_CACHE_DIR=1
+    image: notaai/bot:dev    # local tag (never pushed)
+    restart: unless-stopped
+
+    # ───────── runtime ─────────
+    env_file:                # absolute path → avoid “.env permission denied”
+      - /root/.env           # adjust if your secrets live elsewhere
     environment:
       PYTHONPATH: /app
+
     depends_on:
       - redis
-    restart: unless-stopped
+
+    # bind-mounts only in dev; remove in prod if you copy files into image
+    volumes:
+      - .:/app:ro            # read–only source for live reload / debugging
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     volumes:
       - redis-data:/data
-    restart: unless-stopped
 
 volumes:
   redis-data:
