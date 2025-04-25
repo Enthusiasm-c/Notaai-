@@ -44,11 +44,10 @@ class Config(BaseSettings):
     preview_max_lines: int = 20
     invoice_date_format: str = "%d.%m.%Y"
 
-    # ─── pydantic config ───────────────────────────────────────────────────
+    # ─── pydantic config ──────────────────────────────────────────────
     model_config = SettingsConfigDict(
-        env_prefix="",  # keep original names
-        env_file=".env" if Path(".env").is_file() else None,
-        env_file_encoding="utf-8",
+        env_prefix="",          # читаем окружение как есть
+        env_file=None,          # НЕ ищем .env в контейнере
         validate_assignment=True,
     )
 
