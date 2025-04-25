@@ -474,7 +474,7 @@ async def enrich_invoice(parsed_invoice: Dict[str, Any]) -> Dict[str, Any]:
     
     total_sum_matched_idr = sum(
         item.get("quantity", 0) * item.get("price", 0)
-        for item in enriched_items 
+        for item in enriched_items
         if item.get("match_status") == "matched" and item.get("is_valid", True)
     )
     
@@ -586,11 +586,11 @@ def format_invoice_for_display(invoice_dict: Dict) -> str:
     
     # Списки сопоставленных и несопоставленных товаров
     matched_items = [
-        item for item in items 
+        item for item in items
         if item.get("match_status") == "matched" and item.get("is_valid", True)
     ]
     unmatched_items = [
-        item for item in items 
+        item for item in items
         if item.get("match_status") != "matched" or not item.get("is_valid", True)
     ]
     
