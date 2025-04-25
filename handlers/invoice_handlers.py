@@ -359,7 +359,6 @@ async def handle_fix_item_callback(update: Update, context: ContextTypes.DEFAULT
         int: Next dialog state
     """
     try:
-        user = update.effective_user
         item_index = context.user_data.get("fixing_item_index")
         
         if item_index is None:
@@ -431,11 +430,11 @@ async def handle_fix_item_callback(update: Update, context: ContextTypes.DEFAULT
             
             # Update total sums
             total_qty_matched = sum(
-                item.get("quantity", 0) for item in items 
+                item.get("quantity", 0) for item in items
                 if item.get("match_status") == "matched"
             )
             total_sum_matched_idr = sum(
-                item.get("quantity", 0) * item.get("price", 0) 
+                item.get("quantity", 0) * item.get("price", 0)
                 for item in items if item.get("match_status") == "matched"
             )
             
