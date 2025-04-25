@@ -1,0 +1,47 @@
+# --- чувствительные и конфигурационные файлы ---
+.env
+*.pem
+*.key
+*.crt
+
+# --- артефакты Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# --- виртуальные окружения / PEP 582 ---
+.venv/
+venv/
+__pypackages__/
+
+# --- инструменты / линтеры ---
+/.ruff_cache
+/.mypy_cache
+/.pytest_cache
+
+# --- артефакты сборки, колёс, дистрибутивов ---
+build/
+dist/
+*.egg-info/
+
+# --- система контроля версий ---
+.git/
+.gitignore
+.gitattributes
+
+# --- IDE и редакторы ---
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# --- медиа и большие временные файлы ---
+*.log
+*.tmp
+*.bak
+*.swp
+
+# --- ваша дата-папка, если не нужна в образе ---
+data/
+.env

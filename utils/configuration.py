@@ -8,7 +8,7 @@
 from pathlib import Path
 from typing import Optional
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
 
@@ -33,6 +33,9 @@ class Config(BaseSettings):
     SYRVE_LOGIN: Optional[str] = None
     SYRVE_PASSWORD: Optional[str] = None
     SYRVE_BASE_URL: str = "https://api.syrve.com/api/v2"
+    
+     # главное ─ отключить поиск .env в образе
+    model_config = SettingsConfigDict(env_file=(), case_sensitive=True)
     
     # Пути для временных файлов
     DATA_DIR: Path = Field(default_factory=lambda: Path("data"))
