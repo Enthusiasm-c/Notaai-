@@ -32,3 +32,6 @@ __pycache__/
 # ignore byte-code
 *.pyc
 __pycache__/
+
+# keep secrets local
+.env
