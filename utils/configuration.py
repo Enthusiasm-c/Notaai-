@@ -29,6 +29,10 @@ class Config(BaseSettings):
     """
     Runtime configuration for Nota AI bot and worker services.
     """
+    class Config(BaseSettings):
+    """Runtime configuration for Nota AI."""
+    # ↓↓↓ эта строка отключает поиск .env!
+    model_config = SettingsConfigDict(env_file=(), case_sensitive=True)
 
     # ── General ────────────────────────────────────────────────────────────
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = (
