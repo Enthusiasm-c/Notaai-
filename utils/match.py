@@ -9,9 +9,15 @@ logger = logging.getLogger(__name__)
 
 # Путь к файлу с базой товаров
 PRODUCTS_FILE = os.path.join("data", "base_products.csv")
+SUPPLIERS_FILE = os.path.join("data", "suppliers.csv")
+BUYERS_FILE = os.path.join("data", "buyers.csv")
+UNITS_FILE = os.path.join("data", "canonical_units.csv")
 
-# Кэш для базы товаров
+# Кэш для баз данных
 _products_cache: List[Dict[str, str]] = []
+_suppliers_cache: List[Dict[str, str]] = []
+_buyers_cache: List[Dict[str, str]] = []
+_units_cache: List[str] = []
 
 
 def load_products() -> List[Dict[str, str]]:
@@ -52,6 +58,119 @@ def load_products() -> List[Dict[str, str]]:
     except Exception as e:
         logger.error(f"Error loading products: {e}", exc_info=True)
         return []
+
+
+def load_suppliers() -> List[Dict[str, str]]:
+    """
+    Загружает базу поставщиков из CSV-файла
+
+    Returns:
+        list: Список поставщиков
+    """
+    global _suppliers_cache
+
+    # Если кэш не пуст, используем его
+    if _suppliers_cache:
+        return _suppliers_cache
+
+    # Проверяем наличие файла
+    if not os.path.exists(SUPPLIERS_FILE):
+        logger.warning(f"Suppliers file not found: {SUPPLIERS_FILE}")
+        return []
+
+    try:
+        suppliers = []
+        with open(SUPPLIERS_FILE, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                suppliers.append(
+                    {
+                        "id": row.get("id", ""),
+                        "name": row.get("name", ""),
+                    }
+                )
+
+        # Сохраняем в кэш
+        _suppliers_cache = suppliers
+        logger.info(f"Loaded {len(suppliers)} suppliers from {SUPPLIERS_FILE}")
+        return suppliers
+    except Exception as e:
+        logger.error(f"Error loading suppliers: {e}", exc_info=True)
+        return []
+
+
+def load_buyers() -> List[Dict[str, str]]:
+    """
+    Загружает базу покупателей из CSV-файла
+
+    Returns:
+        list: Список покупателей
+    """
+    global _buyers_cache
+
+    # Если кэш не пуст, используем его
+    if _buyers_cache:
+        return _buyers_cache
+
+    # Проверяем наличие файла
+    if not os.path.exists(BUYERS_FILE):
+        logger.warning(f"Buyers file not found: {BUYERS_FILE}")
+        return []
+
+    try:
+        buyers = []
+        with open(BUYERS_FILE, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                buyers.append(
+                    {
+                        "id": row.get("id", ""),
+                        "name": row.get("name", ""),
+                    }
+                )
+
+        # Сохраняем в кэш
+        _buyers_cache = buyers
+        logger.info(f"Loaded {len(buyers)} buyers from {BUYERS_FILE}")
+        return buyers
+    except Exception as e:
+        logger.error(f"Error loading buyers: {e}", exc_info=True)
+        return []
+
+
+def load_canonical_units() -> List[str]:
+    """
+    Загружает список канонических единиц измерения из CSV-файла
+
+    Returns:
+        list: Список единиц измерения
+    """
+    global _units_cache
+
+    # Если кэш не пуст, используем его
+    if _units_cache:
+        return _units_cache
+
+    # Проверяем наличие файла
+    if not os.path.exists(UNITS_FILE):
+        logger.warning(f"Units file not found: {UNITS_FILE}")
+        return ["kg", "pcs", "pack", "box", "g", "ml", "l"]  # Default units
+
+    try:
+        units = []
+        with open(UNITS_FILE, "r", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if row:
+                    units.append(row[0])
+
+        # Сохраняем в кэш
+        _units_cache = units
+        logger.info(f"Loaded {len(units)} canonical units from {UNITS_FILE}")
+        return units
+    except Exception as e:
+        logger.error(f"Error loading canonical units: {e}", exc_info=True)
+        return ["kg", "pcs", "pack", "box", "g", "ml", "l"]  # Default units
 
 
 def match(item_name: str, threshold: float = 0.6) -> Tuple[Optional[str], float]:
@@ -176,6 +295,20 @@ def save_product(product_id: str, product_name: str, category: str = "") -> bool
         return False
 
 
+def is_valid_unit(unit: str) -> bool:
+    """
+    Проверяет, является ли единица измерения канонической
+
+    Args:
+        unit: Единица измерения для проверки
+
+    Returns:
+        bool: True, если единица измерения валидна
+    """
+    canonical_units = load_canonical_units()
+    return unit.lower() in [u.lower() for u in canonical_units]
+
+
 async def match_products(items: List[Dict]) -> List[Dict]:
     """
     Сопоставляет список товаров с базой данных
@@ -198,11 +331,23 @@ async def match_products(items: List[Dict]) -> List[Dict]:
         item_name = item.get("name", "")
         
         if not item_name:
+            enriched_item["match_score"] = 0
+            enriched_item["product_id"] = None
+            enriched_item["match_status"] = "unmatched"
+            enriched_items.append(enriched_item)
+            continue
+        
+        # Проверяем валидность единицы измерения
+        unit = item.get("unit", "")
+        if unit and not is_valid_unit(unit):
+            enriched_item["match_score"] = 0
+            enriched_item["product_id"] = None
+            enriched_item["match_status"] = "unmatched"
             enriched_items.append(enriched_item)
             continue
         
         # Сопоставляем товар с базой данных
-        product_id, score = match(item_name)
+        product_id, score = match(item_name, threshold=0.6)
         
         # Добавляем результаты сопоставления
         enriched_item["match_score"] = score
@@ -210,8 +355,9 @@ async def match_products(items: List[Dict]) -> List[Dict]:
         # Если оценка сопоставления выше порога, добавляем ID товара
         if score >= 0.6 and product_id:
             enriched_item["product_id"] = product_id
+            enriched_item["match_status"] = "matched"
             
-            # Можно добавить дополнительную информацию о товаре
+            # Добавляем дополнительную информацию о товаре
             product_data = get_product_by_id(product_id)
             if product_data:
                 # Добавляем дополнительные данные товара, если они ещё не заданы
@@ -220,8 +366,93 @@ async def match_products(items: List[Dict]) -> List[Dict]:
                         enriched_item[key] = value
         else:
             enriched_item["product_id"] = None
+            enriched_item["match_status"] = "unmatched"
         
         # Добавляем обогащенный товар в результирующий список
         enriched_items.append(enriched_item)
     
     return enriched_items
+
+
+async def match_supplier_buyer(vendor_name: str, buyer_name: str) -> Dict:
+    """
+    Сопоставляет названия поставщика и покупателя с базой данных
+
+    Args:
+        vendor_name: Название поставщика
+        buyer_name: Название покупателя
+
+    Returns:
+        dict: Результаты сопоставления
+    """
+    # Загружаем базы данных
+    suppliers = load_suppliers()
+    buyers = load_buyers()
+    
+    # Инициализируем результат
+    result = {
+        "vendor_id": None,
+        "vendor_name": vendor_name,
+        "buyer_id": None,
+        "buyer_name": buyer_name,
+        "vendor_confidence": 0,
+        "buyer_confidence": 0,
+    }
+    
+    # Сопоставляем поставщика
+    if vendor_name:
+        best_vendor_score = 0
+        best_vendor_match = None
+        
+        for supplier in suppliers:
+            supplier_name = supplier.get("name", "").lower().strip()
+            vendor_name_lower = vendor_name.lower().strip()
+            
+            # Проверяем точное совпадение
+            if supplier_name == vendor_name_lower:
+                best_vendor_match = supplier
+                best_vendor_score = 1.0
+                break
+            
+            # Используем нечеткое сопоставление
+            score = difflib.SequenceMatcher(None, vendor_name_lower, supplier_name).ratio()
+            
+            if score > best_vendor_score:
+                best_vendor_score = score
+                best_vendor_match = supplier
+        
+        # Если нашли совпадение с достаточной уверенностью
+        if best_vendor_score >= 0.6 and best_vendor_match:
+            result["vendor_id"] = best_vendor_match.get("id")
+            result["vendor_name"] = best_vendor_match.get("name")
+            result["vendor_confidence"] = best_vendor_score
+    
+    # Сопоставляем покупателя
+    if buyer_name:
+        best_buyer_score = 0
+        best_buyer_match = None
+        
+        for buyer in buyers:
+            buyer_db_name = buyer.get("name", "").lower().strip()
+            buyer_name_lower = buyer_name.lower().strip()
+            
+            # Проверяем точное совпадение
+            if buyer_db_name == buyer_name_lower:
+                best_buyer_match = buyer
+                best_buyer_score = 1.0
+                break
+            
+            # Используем нечеткое сопоставление
+            score = difflib.SequenceMatcher(None, buyer_name_lower, buyer_db_name).ratio()
+            
+            if score > best_buyer_score:
+                best_buyer_score = score
+                best_buyer_match = buyer
+        
+        # Если нашли совпадение с достаточной уверенностью
+        if best_buyer_score >= 0.6 and best_buyer_match:
+            result["buyer_id"] = best_buyer_match.get("id")
+            result["buyer_name"] = best_buyer_match.get("name")
+            result["buyer_confidence"] = best_buyer_score
+    
+    return result
