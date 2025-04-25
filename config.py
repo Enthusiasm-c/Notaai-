@@ -1,70 +1,45 @@
+# utils/configuration.py
 """
-Конфигурация и константы для работы бота NotaAI.
+Centralised runtime configuration for NotaAI services.
 
-Включает состояния диалога и настройки приложения, читаемые из переменных окружения.
+* Reads only OS-level environment variables passed by Docker Compose
+* No search for '.env' inside the image  →  avoids PermissionError
+* Type-safe thanks to Pydantic v2
 """
-import logging
-import sys
-from enum import IntEnum, auto
-from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-)
+class Config(BaseSettings):
+    model_config = SettingsConfigDict(env_file=(), case_sensitive=True)
+    """Runtime settings used by OCR-, Syrve- and storage-services."""
+
+    # —————————————————      API KEYS / TOKENS      —————————————————
+    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
+    telegram_token: str = Field(
+        ...,
+        env=["TELEGRAM_TOKEN", "TELEGRAM_BOT_TOKEN"],  # оба имён подходят
+    )
+
+    # —————————————————      SYRVE BACKEND          —————————————————
+    syrve_server_url: str = Field(..., env="SYRVE_SERVER_URL")  # e.g. https://example.syrve.online:443
+    syrve_login: str = Field(..., env="SYRVE_LOGIN")
+    syrve_password: str = Field(..., env="SYRVE_PASSWORD")
+    default_store_id: str = Field(..., env="DEFAULT_STORE_ID")
+
+    # —————————————————      PATHS TO CSV DATA      —————————————————
+    products_csv: str = Field("data/base_products.csv", env="PRODUCTS_CSV")
+    suppliers_csv: str = Field("data/base_suppliers.csv", env="SUPPLIERS_CSV")
+    learned_products_csv: str = Field(
+        "data/learned_products.csv", env="LEARNED_PRODUCTS_CSV"
+    )
+
+    # pydantic-settings configuration: NO .env lookup, case-sensitive env names
+    model_config = SettingsConfigDict(env_file=(), case_sensitive=True)
 
 
-# Состояния диалога
-class BotState(IntEnum):
-    WAIT_PHOTO = 0          # ждём фото / PDF
-    CONFIRMATION = auto()   # проверка всей накладной
-    FIX_ITEM = auto()       # пользователь исправляет 1 позицию
-    ADD_NEW_ITEM = auto()
-    EDIT_ITEM = auto()
-    SELECT_EDIT_ITEM = auto()
-    SET_CONVERSION = auto()
-    FINAL_CONFIRMATION = auto()
+# singleton used by the rest of the code-base
+settings = Config()
 
-
-# Экспортируем BotState как отдельные константы
-_m = sys.modules[__name__]
-for _n, _v in BotState.__members__.items():
-    setattr(_m, _n, _v)
-del _m, _n, _v
-
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=None, case_sensitive=True)
-    
-    TELEGRAM_TOKEN: str = Field(..., env=["TELEGRAM_TOKEN", "TELEGRAM_BOT_TOKEN"])
-    OPENAI_API_KEY: str = Field(..., description="OpenAI API Key")
-    OPENAI_MODEL: str = Field("gpt-4o", description="OpenAI Model to use")
-    
-    SYRVE_LOGIN: str = Field("", description="Syrve API Login")
-    SYRVE_PASSWORD: str = Field("", description="Syrve API Password")
-    SYRVE_BASE_URL: str = Field("https://api.syrve.com/api/v2", description="Syrve API Base URL")
-    
-    REDIS_URL: str = Field("redis://redis:6379/0", description="Redis Connection URL")
-
-
-# Инициализация настроек
-try:
-    settings = Settings()
-except Exception as e:
-    raise ValueError(f"Configuration error: {e}") from e
-
-
-# Словарь для хранения данных пользователей
-user_data = {}  # dict[int, dict]
-
-# Пути к файлам данных
-BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
-
-
-__all__ = ['settings', 'BotState', 'user_data', 'BASE_DIR', 'DATA_DIR'] + list(BotState.__members__)
+__all__ = ["Config", "settings"]
