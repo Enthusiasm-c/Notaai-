@@ -366,7 +366,6 @@ async def extract_supplier_buyer(ocr_data: Dict) -> Dict:
     Returns:
         dict: Информация о поставщике и покупателе
     """
-    from utils.match import match
     
     # Извлекаем имя поставщика из OCR данных
     vendor_name = ocr_data.get("vendor_name", "")
