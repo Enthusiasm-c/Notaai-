@@ -92,13 +92,29 @@ async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Format invoice data for display
         formatted_message = format_invoice_for_display(invoice_data)
         
-        # Create keyboard with fixes for unmatched items
+        # Create keyboard with action buttons
         keyboard = []
         
-        # Add fix buttons for unmatched items
+        # Check if supplier and buyer are set
+        supplier_id = invoice_data.get("vendor_id")
+        buyer_found = invoice_data.get("buyer_found", False)
+        
+        # Add supplier selection button if needed
+        if not supplier_id:
+            keyboard.append([
+                InlineKeyboardButton("🖊️ Select supplier", callback_data="select_supplier")
+            ])
+        
+        # Add buyer input button if needed
+        if not buyer_found:
+            keyboard.append([
+                InlineKeyboardButton("🖊️ Set buyer", callback_data="set_buyer")
+            ])
+        
+        # Add fix buttons for unmatched or invalid items
         unmatched_items = [
             item for item in invoice_data.get("items", [])
-            if item.get("match_status") == "unmatched"
+            if item.get("match_status") == "unmatched" or not item.get("is_valid", True)
         ]
         
         fix_buttons = []
@@ -113,17 +129,11 @@ async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 keyboard.append(fix_buttons)
                 fix_buttons = []
         
-        # Add confirm button if there are matched items
-        matched_count = invoice_data.get("matched_count", 0)
-        if matched_count > 0:
+        # Add confirm button only if all items are matched and valid, and supplier/buyer are set
+        unmatched_count = invoice_data.get("unmatched_count", 0)
+        if unmatched_count == 0 and supplier_id and buyer_found:
             keyboard.append([
-                InlineKeyboardButton("Confirm matched", callback_data="confirm_invoice"),
-            ])
-        
-        # If no unmatched items, add "Send to Syrve" button
-        if len(unmatched_items) == 0:
-            keyboard.append([
-                InlineKeyboardButton("📤 Send to Syrve", callback_data="send_to_syrve"),
+                InlineKeyboardButton("✅ Confirm & send to Syrve", callback_data="send_to_syrve"),
             ])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -140,7 +150,7 @@ async def handle_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         # Edit processing message
         await processing_message.edit_text(
-            formatted_message + "\n\n<i>Review the data and confirm matched items or fix unmatched ones.</i>",
+            formatted_message + "\n\n<i>Review the data and fix any issues.</i>",
             reply_markup=reply_markup,
             parse_mode="HTML",
         )
@@ -183,50 +193,7 @@ async def handle_invoice_callback(update: Update, context: ContextTypes.DEFAULT_
     # Get callback data
     callback_data = query.data
     
-    if callback_data == "confirm_invoice":
-        # Check if there are still unmatched items
-        invoice_data = context.user_data.get("invoice", {})
-        unmatched_count = invoice_data.get("unmatched_count", 0)
-        
-        if unmatched_count > 0:
-            # Show confirmation with unmatched items notice
-            formatted_message = format_invoice_for_display(invoice_data)
-            
-            keyboard = [
-                [
-                    InlineKeyboardButton("📤 Send to Syrve", callback_data="send_to_syrve"),
-                    InlineKeyboardButton("⬅️ Back", callback_data="back_to_edit"),
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.edit_message_text(
-                formatted_message + f"\n\n⚠️ <b>Warning: {unmatched_count} items still need fixing.</b>\n"
-                f"<i>Do you want to proceed with only matched items?</i>",
-                reply_markup=reply_markup,
-                parse_mode="HTML",
-            )
-            
-            return CONFIRMATION
-        else:
-            # All items matched, show final confirmation
-            keyboard = [
-                [
-                    InlineKeyboardButton("📤 Send to Syrve", callback_data="send_to_syrve"),
-                    InlineKeyboardButton("❌ Cancel", callback_data="reject_invoice"),
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.edit_message_text(
-                query.message.text + "\n\n✅ <b>Ready to send to Syrve!</b>",
-                reply_markup=reply_markup,
-                parse_mode="HTML",
-            )
-            
-            return CONFIRMATION
-    
-    elif callback_data == "send_to_syrve":
+    if callback_data == "send_to_syrve":
         invoice_data = context.user_data.get("invoice", {})
         
         # Call Syrve service to commit document
@@ -234,7 +201,7 @@ async def handle_invoice_callback(update: Update, context: ContextTypes.DEFAULT_
         
         if success:
             await query.edit_message_text(
-                query.message.text + "\n\n✅ <b>Successfully sent to Syrve!</b>",
+                "Invoice sent to Syrve ✔️",
                 parse_mode="HTML",
             )
             
@@ -265,13 +232,29 @@ async def handle_invoice_callback(update: Update, context: ContextTypes.DEFAULT_
         invoice_data = context.user_data.get("invoice", {})
         formatted_message = format_invoice_for_display(invoice_data)
         
-        # Recreate keyboard with fixes for unmatched items
+        # Create keyboard with action buttons
         keyboard = []
+        
+        # Check if supplier and buyer are set
+        supplier_id = invoice_data.get("vendor_id")
+        buyer_found = invoice_data.get("buyer_found", False)
+        
+        # Add supplier selection button if needed
+        if not supplier_id:
+            keyboard.append([
+                InlineKeyboardButton("🖊️ Select supplier", callback_data="select_supplier")
+            ])
+        
+        # Add buyer input button if needed
+        if not buyer_found:
+            keyboard.append([
+                InlineKeyboardButton("🖊️ Set buyer", callback_data="set_buyer")
+            ])
         
         # Add fix buttons for unmatched items
         unmatched_items = [
             item for item in invoice_data.get("items", [])
-            if item.get("match_status") == "unmatched"
+            if item.get("match_status") == "unmatched" or not item.get("is_valid", True)
         ]
         
         fix_buttons = []
@@ -286,15 +269,17 @@ async def handle_invoice_callback(update: Update, context: ContextTypes.DEFAULT_
                 keyboard.append(fix_buttons)
                 fix_buttons = []
         
-        # Add confirm button
-        keyboard.append([
-            InlineKeyboardButton("Confirm matched", callback_data="confirm_invoice"),
-        ])
+        # Add confirm button if all items are valid and supplier/buyer are set
+        unmatched_count = invoice_data.get("unmatched_count", 0)
+        if unmatched_count == 0 and supplier_id and buyer_found:
+            keyboard.append([
+                InlineKeyboardButton("✅ Confirm & send to Syrve", callback_data="send_to_syrve"),
+            ])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
-            formatted_message + "\n\n<i>Review the data and confirm matched items or fix unmatched ones.</i>",
+            formatted_message + "\n\n<i>Review the data and fix any issues.</i>",
             reply_markup=reply_markup,
             parse_mode="HTML",
         )
@@ -330,10 +315,10 @@ async def handle_invoice_callback(update: Update, context: ContextTypes.DEFAULT_
                 f"<b>Fixing item #{item_index+1}:</b>\n\n"
                 f"Current: {item.get('name', 'Unknown')} - "
                 f"{item.get('quantity', 0)} {item.get('unit', 'pcs')} × "
-                f"{item.get('price', 0):,.2f}\n\n"
-                f"<i>Please send a message with the corrected information in this format:</i>\n"
-                f"<code>name quantity unit price</code>\n\n"
-                f"Example: <code>Tomato 2 kg 20000</code>",
+                f"{item.get('price', 0):,.0f}\n\n"
+                f"<i>Send corrected line in format:</i>\n"
+                f"<code>qty unit name price</code>\n\n"
+                f"Example: <code>2 kg Tomato 20000</code>",
                 parse_mode="HTML",
             )
             
@@ -378,8 +363,8 @@ async def handle_fix_item_callback(update: Update, context: ContextTypes.DEFAULT
             
             if len(parts) < 4:
                 await update.message.reply_text(
-                    "❌ Invalid format. Please use: name quantity unit price\n"
-                    "Example: Tomato 2 kg 20000"
+                    "❌ Invalid format. Please use: qty unit name price\n"
+                    "Example: 2 kg Tomato 20000"
                 )
                 return FIX_ITEM
             
@@ -392,20 +377,20 @@ async def handle_fix_item_callback(update: Update, context: ContextTypes.DEFAULT
                 )
                 return FIX_ITEM
             
-            # Extract unit (second to last part)
-            unit = parts[-2]
+            # Extract unit (second part)
+            unit = parts[1]
             
-            # Extract quantity (third to last part)
+            # Extract quantity (first part)
             try:
-                quantity = float(parts[-3])
+                quantity = float(parts[0])
             except ValueError:
                 await update.message.reply_text(
                     "❌ Invalid quantity. Please enter a number for quantity."
                 )
                 return FIX_ITEM
             
-            # Extract name (all remaining parts at the beginning)
-            name = " ".join(parts[:-3])
+            # Extract name (all remaining parts in the middle)
+            name = " ".join(parts[2:-1])
             
             # Update item
             items[item_index].update({
@@ -414,6 +399,7 @@ async def handle_fix_item_callback(update: Update, context: ContextTypes.DEFAULT
                 "unit": unit,
                 "price": price,
                 "match_status": "matched",  # Mark as manually matched
+                "is_valid": quantity > 0 and price > 0,  # Check validity
             })
             
             # Re-validate and update item
@@ -425,17 +411,18 @@ async def handle_fix_item_callback(update: Update, context: ContextTypes.DEFAULT
                 items[item_index]["match_score"] = score
             
             # Update counts
-            matched_count = sum(1 for item in items if item.get("match_status") == "matched")
+            matched_count = sum(1 for item in items 
+                                if item.get("match_status") == "matched" and item.get("is_valid", True))
             unmatched_count = len(items) - matched_count
             
             # Update total sums
             total_qty_matched = sum(
                 item.get("quantity", 0) for item in items
-                if item.get("match_status") == "matched"
+                if item.get("match_status") == "matched" and item.get("is_valid", True)
             )
             total_sum_matched_idr = sum(
                 item.get("quantity", 0) * item.get("price", 0)
-                for item in items if item.get("match_status") == "matched"
+                for item in items if item.get("match_status") == "matched" and item.get("is_valid", True)
             )
             
             # Update invoice data
@@ -450,13 +437,29 @@ async def handle_fix_item_callback(update: Update, context: ContextTypes.DEFAULT
             # Format updated invoice
             formatted_message = format_invoice_for_display(invoice_data)
             
-            # Create keyboard with fixes for remaining unmatched items
+            # Create keyboard with action buttons
             keyboard = []
             
-            # Add fix buttons for unmatched items
+            # Check if supplier and buyer are set
+            supplier_id = invoice_data.get("vendor_id")
+            buyer_found = invoice_data.get("buyer_found", False)
+            
+            # Add supplier selection button if needed
+            if not supplier_id:
+                keyboard.append([
+                    InlineKeyboardButton("🖊️ Select supplier", callback_data="select_supplier")
+                ])
+            
+            # Add buyer input button if needed
+            if not buyer_found:
+                keyboard.append([
+                    InlineKeyboardButton("🖊️ Set buyer", callback_data="set_buyer")
+                ])
+            
+            # Add fix buttons for unmatched or invalid items
             unmatched_items = [
                 item for item in items
-                if item.get("match_status") == "unmatched"
+                if item.get("match_status") == "unmatched" or not item.get("is_valid", True)
             ]
             
             fix_buttons = []
@@ -471,16 +474,10 @@ async def handle_fix_item_callback(update: Update, context: ContextTypes.DEFAULT
                     keyboard.append(fix_buttons)
                     fix_buttons = []
             
-            # Add confirm button
-            if matched_count > 0:
+            # Add confirm button if all items are matched and valid, and supplier/buyer are set
+            if unmatched_count == 0 and supplier_id and buyer_found:
                 keyboard.append([
-                    InlineKeyboardButton("Confirm matched", callback_data="confirm_invoice"),
-                ])
-            
-            # If no unmatched items, add "Send to Syrve" button
-            if unmatched_count == 0:
-                keyboard.append([
-                    InlineKeyboardButton("📤 Send to Syrve", callback_data="send_to_syrve"),
+                    InlineKeyboardButton("✅ Confirm & send to Syrve", callback_data="send_to_syrve"),
                 ])
             
             reply_markup = InlineKeyboardMarkup(keyboard)
