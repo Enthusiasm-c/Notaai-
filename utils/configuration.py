@@ -49,7 +49,7 @@ class Config(BaseSettings):
 
     # ── OpenAI / LLM ───────────────────────────────────────────────────────
     OPENAI_API_KEY: str = Field(..., min_length=30)
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_MODEL: str = "gpt-4o"
 
     # ── Syrve integration ─────────────────────────────────────────────────
     SYRVE_SERVER_URL: str
