@@ -1,12 +1,10 @@
+import logging
+from pathlib import Path
 import os
 os.environ.setdefault("TELEGRAM_TOKEN", os.getenv("TELEGRAM_BOT_TOKEN", ""))
 """
 Конфигурация и константы для работы бота NotaAI.
 """
-
-import logging
-import os
-from pathlib import Path
 
 # Настройка логирования
 logging.basicConfig(
