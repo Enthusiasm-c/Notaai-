@@ -50,6 +50,7 @@ del _self, _name
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=None)
     TELEGRAM_TOKEN: str = Field(..., env='TELEGRAM_TOKEN')
     OPENAI_API_KEY: str = Field(..., env='OPENAI_API_KEY')
     OPENAI_MODEL: str = Field('gpt-4o', env='OPENAI_MODEL')
