@@ -34,7 +34,7 @@ class Config(BaseSettings):
     SYRVE_PASSWORD: Optional[str] = None
     SYRVE_BASE_URL: str = "https://api.syrve.com/api/v2"
     
-     # главное ─ отключить поиск .env в образе
+    # главное ─ отключить поиск .env в образе
     model_config = SettingsConfigDict(env_file=(), case_sensitive=True)
     
     # Пути для временных файлов
