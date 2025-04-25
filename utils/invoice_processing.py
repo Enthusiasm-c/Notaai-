@@ -328,12 +328,12 @@ async def enrich_invoice(parsed_invoice: Dict[str, Any]) -> Dict[str, Any]:
     
     # Рассчитываем общее количество и сумму сопоставленных товаров
     total_qty_matched = sum(
-        item.get("quantity", 0) for item in enriched_items 
+        item.get("quantity", 0) for item in enriched_items
         if item.get("match_status") == "matched"
     )
     
     total_sum_matched_idr = sum(
-        item.get("quantity", 0) * item.get("price", 0) 
+        item.get("quantity", 0) * item.get("price", 0)
         for item in enriched_items if item.get("match_status") == "matched"
     )
     
