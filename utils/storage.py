@@ -5,7 +5,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Any, Union
+from typing import Union
 
 __all__ = ["save_temp_file", "TEMP_DIR"]
 
