@@ -1,231 +1,116 @@
-import os
+# utils/match.py
+"""
+Helper-module for product / supplier lookup & fuzzy matching.
+
+CSV schema (minimum):
+    id,name
+    123e4567-e89b-12d3-a456-426614174000,Paprika Red
+"""
+
+from __future__ import annotations
+
 import csv
-import logging
-import difflib
-from typing import Tuple, Optional, List, Dict
+from functools import lru_cache
+from pathlib import Path
+from typing import Dict, List, Tuple
 
-# Получаем логгер
-logger = logging.getLogger(__name__)
+from rapidfuzz import fuzz, process
 
-# Путь к файлу с базой товаров
-PRODUCTS_FILE = os.path.join("data", "base_products.csv")
+# ──────────────────────────────── paths ────────────────────────────────
+_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+_PRODUCTS_CSV = _DATA_DIR / "base_products.csv"
+_SUPPLIERS_CSV = _DATA_DIR / "base_suppliers.csv"
 
-# Кэш для базы товаров
-_products_cache: List[Dict[str, str]] = []
+# ────────────────────────── CSV loaders (cached) ───────────────────────
+def _load_csv(path: Path) -> List[Dict[str, str]]:
+    if not path.is_file():
+        raise FileNotFoundError(f"CSV not found: {path}")
+    with path.open(encoding="utf-8") as fh:
+        return list(csv.DictReader(fh))
 
 
-def load_products() -> List[Dict[str, str]]:
+@lru_cache(maxsize=1)
+def load_products_db() -> List[Dict[str, str]]:
+    """Return entire products DB (list of dicts) – cached."""
+    return _load_csv(_PRODUCTS_CSV)
+
+
+@lru_cache(maxsize=1)
+def load_suppliers_db() -> List[Dict[str, str]]:
+    """Return entire suppliers DB (list of dicts) – cached."""
+    return _load_csv(_SUPPLIERS_CSV)
+
+
+# ──────────────────────── helpers / look-ups ───────────────────────────
+def _index_by_id(rows: List[Dict[str, str]]) -> Dict[str, Dict[str, str]]:
+    return {row["id"]: row for row in rows if row.get("id")}
+
+
+_PRODUCT_IDX = _index_by_id(load_products_db())
+_SUPPLIER_IDX = _index_by_id(load_suppliers_db())
+
+
+def get_product_by_id(pid: str) -> Dict[str, str] | None:
+    """Exact lookup by product ID (UUID-string)."""
+    return _PRODUCT_IDX.get(pid)
+
+
+def get_supplier_by_id(sid: str) -> Dict[str, str] | None:
+    """Exact lookup by supplier ID (UUID-string)."""
+    return _SUPPLIER_IDX.get(sid)
+
+
+# ─────────────────────────── fuzzy matching ────────────────────────────
+def _build_name_list(rows: List[Dict[str, str]]) -> List[str]:
+    return [row["name"] for row in rows if row.get("name")]
+
+
+_PRODUCT_NAMES = _build_name_list(load_products_db())
+_SUPPLIER_NAMES = _build_name_list(load_suppliers_db())
+
+
+def match_product(query: str, min_score: int = 80) -> Tuple[str | None, int]:
     """
-    Загружает базу товаров из CSV-файла
-
-    Returns:
-        list: Список товаров
+    Fuzzy-match arbitrary `query` against product names.
+    Returns (product_id | None, score 0-100).
     """
-    global _products_cache
+    name, score, _ = process.extractOne(
+        query,
+        _PRODUCT_NAMES,
+        scorer=fuzz.WRatio,
+        score_cutoff=min_score,
+    ) or (None, 0, None)
 
-    # Если кэш не пуст, используем его
-    if _products_cache:
-        return _products_cache
-
-    # Проверяем наличие файла
-    if not os.path.exists(PRODUCTS_FILE):
-        logger.warning(f"Products file not found: {PRODUCTS_FILE}")
-        return []
-
-    try:
-        products = []
-        with open(PRODUCTS_FILE, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                products.append(
-                    {
-                        "id": row.get("id", ""),
-                        "name": row.get("name", ""),
-                        "category": row.get("category", ""),
-                    }
-                )
-
-        # Сохраняем в кэш
-        _products_cache = products
-        logger.info(f"Loaded {len(products)} products from {PRODUCTS_FILE}")
-        return products
-    except Exception as e:
-        logger.error(f"Error loading products: {e}", exc_info=True)
-        return []
+    if name:
+        # find first row with that exact name
+        for row in load_products_db():
+            if row["name"] == name:
+                return row["id"], score
+    return None, score
 
 
-def match(item_name: str, threshold: float = 0.6) -> Tuple[Optional[str], float]:
-    """
-    Сопоставляет название товара с базой данных
+def match_supplier(query: str, min_score: int = 90) -> Tuple[str | None, int]:
+    """Same as `match_product`, but on supplier names."""
+    name, score, _ = process.extractOne(
+        query,
+        _SUPPLIER_NAMES,
+        scorer=fuzz.WRatio,
+        score_cutoff=min_score,
+    ) or (None, 0, None)
 
-    Args:
-        item_name: Название товара
-        threshold: Порог схожести (от 0 до 1)
-
-    Returns:
-        tuple: (ID товара, оценка схожести) или (None, 0) если не найдено
-    """
-    # Загружаем базу товаров
-    products = load_products()
-
-    if not products:
-        logger.warning("No products available for matching")
-        return None, 0
-
-    best_match = None
-    best_score = 0
-
-    # Нормализуем название товара
-    item_name_lower = item_name.lower().strip()
-
-    # Ищем точное совпадение
-    for product in products:
-        product_name = product.get("name", "").lower().strip()
-
-        if product_name == item_name_lower:
-            # Нашли точное совпадение
-            logger.info(f"Exact match for '{item_name}': {product.get('name')}")
-            return product.get("id"), 1.0
-
-    # Если точное совпадение не найдено, используем нечеткое сопоставление
-    for product in products:
-        product_name = product.get("name", "").lower().strip()
-
-        # Используем алгоритм SequenceMatcher для нечеткого сопоставления
-        score = difflib.SequenceMatcher(None, item_name_lower, product_name).ratio()
-
-        # Обновляем лучшее совпадение, если текущее лучше
-        if score > best_score:
-            best_match = product
-            best_score = score
-
-    # Проверяем, превышает ли лучшее совпадение порог
-    if best_score >= threshold and best_match:
-        logger.info(
-            f"Best match for '{item_name}': {best_match.get('name')} (score: {best_score:.2f})"
-        )
-        return best_match.get("id"), best_score
-    else:
-        logger.info(f"No match found for '{item_name}' (best score: {best_score:.2f})")
-
-        return None, 0
+    if name:
+        for row in load_suppliers_db():
+            if row["name"] == name:
+                return row["id"], score
+    return None, score
 
 
-def get_product_by_id(product_id: str) -> Optional[Dict[str, str]]:
-    """
-    Возвращает информацию о товаре по его ID
-
-    Args:
-        product_id: ID товара
-
-    Returns:
-        dict: Информация о товаре или None, если товар не найден
-    """
-    # Загружаем базу товаров
-    products = load_products()
-
-    # Ищем товар по ID
-    for product in products:
-        if product.get("id") == product_id:
-            return product
-
-    return None
-
-
-def save_product(product_id: str, product_name: str, category: str = "") -> bool:
-    """
-    Сохраняет новый товар в базу данных
-
-    Args:
-        product_id: ID товара
-        product_name: Название товара
-        category: Категория товара
-
-    Returns:
-        bool: Успешно ли сохранен товар
-    """
-    try:
-        # Проверяем наличие файла
-        file_exists = os.path.exists(PRODUCTS_FILE)
-
-        # Создаем директорию, если ее нет
-        os.makedirs(os.path.dirname(PRODUCTS_FILE), exist_ok=True)
-
-        # Режим записи зависит от того, существует ли файл
-        mode = "a" if file_exists else "w"
-
-        # Добавляем товар в файл
-        with open(PRODUCTS_FILE, mode, newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-
-            # Записываем заголовки, если файл новый
-            if not file_exists:
-                writer.writerow(["id", "name", "category"])
-
-            # Записываем товар
-            writer.writerow([product_id, product_name, category])
-
-        # Добавляем товар в кэш
-        if _products_cache is not None:
-            _products_cache.append({"id": product_id, "name": product_name, "category": category})
-
-        logger.info(f"Saved new product: {product_name} (ID: {product_id})")
-        return True
-    except Exception as e:
-        logger.error(f"Error saving product: {e}", exc_info=True)
-        return False
-
-
-async def match_products(items: List[Dict]) -> List[Dict]:
-    """
-    Сопоставляет список товаров с базой данных
-    
-    Args:
-        items: Список товаров для сопоставления
-    
-    Returns:
-        list: Список обогащенных товаров с результатами сопоставления
-    """
-    # Создаем копию списка товаров
-    enriched_items = []
-    
-    # Обрабатываем каждый товар
-    for item in items:
-        # Создаем копию товара
-        enriched_item = item.copy()
-        
-        # Получаем название товара
-        item_name = item.get("name", "")
-        
-        if not item_name:
-            enriched_item["match_score"] = 0
-            enriched_item["match_status"] = "unmatched"
-            enriched_items.append(enriched_item)
-            continue
-        
-        # Сопоставляем товар с базой данных
-        product_id, score = match(item_name)
-        
-        # Добавляем результаты сопоставления
-        enriched_item["match_score"] = score
-        
-        # Устанавливаем статус сопоставления
-        if score >= 0.6 and product_id:
-            enriched_item["product_id"] = product_id
-            enriched_item["match_status"] = "matched"
-            
-            # Можно добавить дополнительную информацию о товаре
-            product_data = get_product_by_id(product_id)
-            if product_data:
-                # Добавляем дополнительные данные товара, если они ещё не заданы
-                for key, value in product_data.items():
-                    if key not in enriched_item:
-                        enriched_item[key] = value
-        else:
-            enriched_item["product_id"] = None
-            enriched_item["match_status"] = "unmatched"
-        
-        # Добавляем обогащенный товар в результирующий список
-        enriched_items.append(enriched_item)
-    
-    return enriched_items
+# ───────────────────────── module public API ───────────────────────────
+__all__ = [
+    "load_products_db",
+    "load_suppliers_db",
+    "get_product_by_id",
+    "get_supplier_by_id",
+    "match_product",
+    "match_supplier",
+]
