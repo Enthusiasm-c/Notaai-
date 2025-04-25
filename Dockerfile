@@ -1,56 +1,32 @@
-# syntax=docker/dockerfile:1
-
-# Stage 1: Builder
+# ────────────────────── 1-я стадия: builder ──────────────────────
 FROM python:3.11-slim AS builder
-
 WORKDIR /app
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Обновляем APT и ставим gcc + curl только здесь
+RUN set -eux \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends build-essential curl \
+ && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements or pyproject.toml
+# Кэшируем python-зависимости в виде wheel-ов
 COPY requirements.txt .
+RUN pip install --upgrade pip \
+ && pip wheel -r requirements.txt -w /wheels
 
-# Create virtualenv and install dependencies
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Stage 2: Runtime
+# ────────────────────── 2-я стадия: runtime ──────────────────────
 FROM python:3.11-slim
-
 WORKDIR /app
-ENV PYTHONPATH=/app:$PYTHONPATH
 
-# Install runtime dependencies (curl for healthcheck)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# — В runtime-слое APT больше не нужен —
+COPY --from=builder /wheels /wheels
+RUN pip install --no-cache-dir /wheels/* \
+ && rm -rf /wheels
 
-# Copy virtual environment from builder
-COPY --from=builder /opt/venv /opt/venv
+# Копируем исходный код бота
+COPY . /app
 
-# Set PATH to use virtualenv
-ENV PATH="/opt/venv/bin:$PATH"
+# Удобный вывод в логах
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
-# Create non-root user
-RUN useradd -m -u 1000 notaai
-USER notaai
-
-# Copy application code
-COPY --chown=notaai:notaai . .
-
-# Expose port for healthcheck endpoint
-ENV PORT=8080
-EXPOSE 8080
-
-# Set Python to run in unbuffered mode (recommended for containerized Python)
-ENV PYTHONUNBUFFERED=1
-
-# Set the default command
 CMD ["python", "main.py"]
