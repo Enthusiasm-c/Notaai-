@@ -411,7 +411,7 @@ async def handle_fix_item_callback(update: Update, context: ContextTypes.DEFAULT
                 items[item_index]["match_score"] = score
             
             # Update counts
-            matched_count = sum(1 for item in items 
+            matched_count = sum(1 for item in items
                                 if item.get("match_status") == "matched" and item.get("is_valid", True))
             unmatched_count = len(items) - matched_count
             
