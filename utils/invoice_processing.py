@@ -6,12 +6,22 @@
 import dataclasses
 import datetime
 import logging
+import csv
+import os
 from typing import Any, Dict, List, Optional, Tuple
+
+from rapidfuzz import fuzz
 
 from utils.learning import load_unit_conversions
 
 # Получаем логгер
 logger = logging.getLogger(__name__)
+
+# Путь к файлу с базой поставщиков
+SUPPLIERS_FILE = os.path.join("data", "base_suppliers.csv")
+
+# Кэш для базы поставщиков
+_suppliers_cache: List[Dict[str, str]] = []
 
 __all__ = [
     "apply_unit_conversions",
@@ -23,7 +33,97 @@ __all__ = [
     "check_product_exists",
     "extract_supplier_buyer",
     "ensure_result",
+    "find_supplier",
+    "load_suppliers",
 ]
+
+
+def load_suppliers() -> List[Dict[str, str]]:
+    """
+    Загружает базу поставщиков из CSV-файла
+
+    Returns:
+        list: Список поставщиков
+    """
+    global _suppliers_cache
+
+    # Если кэш не пуст, используем его
+    if _suppliers_cache:
+        return _suppliers_cache
+
+    # Проверяем наличие файла
+    if not os.path.exists(SUPPLIERS_FILE):
+        logger.warning(f"Suppliers file not found: {SUPPLIERS_FILE}")
+        return []
+
+    try:
+        suppliers = []
+        with open(SUPPLIERS_FILE, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                suppliers.append(
+                    {
+                        "id": row.get("id", ""),
+                        "name": row.get("name", ""),
+                    }
+                )
+
+        # Сохраняем в кэш
+        _suppliers_cache = suppliers
+        logger.info(f"Loaded {len(suppliers)} suppliers from {SUPPLIERS_FILE}")
+        return suppliers
+    except Exception as e:
+        logger.error(f"Error loading suppliers: {e}", exc_info=True)
+        return []
+
+
+def find_supplier(supplier_name: str) -> Optional[Tuple[str, str]]:
+    """
+    Поиск поставщика по названию с учетом опечаток (Левенштейн ≤ 2)
+
+    Args:
+        supplier_name: Название поставщика
+
+    Returns:
+        Optional[Tuple[str, str]]: (ID поставщика, название) или None, если не найден
+    """
+    suppliers = load_suppliers()
+    if not suppliers:
+        logger.warning("No suppliers available for matching")
+        return None
+
+    # Нормализуем имя поставщика
+    supplier_name_lower = supplier_name.lower().strip()
+
+    matches = []
+    for supplier in suppliers:
+        supplier_name_db = supplier.get("name", "").lower().strip()
+        
+        # Проверяем точное совпадение
+        if supplier_name_lower == supplier_name_db:
+            return supplier.get("id"), supplier.get("name", "")
+        
+        # Проверяем по расстоянию Левенштейна
+        score = fuzz.ratio(supplier_name_lower, supplier_name_db)
+        levenshtein_dist = len(supplier_name_lower) + len(supplier_name_db) - (score * (len(supplier_name_lower) + len(supplier_name_db)) / 100) / 2
+        
+        # Если расстояние Левенштейна ≤ 2
+        if levenshtein_dist <= 2:
+            matches.append((supplier.get("id"), supplier.get("name", ""), score))
+
+    # Если найдено ровно одно совпадение
+    if len(matches) == 1:
+        supplier_id, supplier_name, score = matches[0]
+        logger.info(f"Found supplier match: {supplier_name} (ID: {supplier_id}, score: {score})")
+        return supplier_id, supplier_name
+    
+    # Если найдено несколько совпадений, логируем и возвращаем None
+    if matches:
+        logger.info(f"Multiple supplier matches found for '{supplier_name}': {matches}")
+    else:
+        logger.info(f"No supplier match found for '{supplier_name}'")
+    
+    return None
 
 
 def apply_unit_conversions(matched_data: Dict) -> List[Dict]:
@@ -99,17 +199,17 @@ def format_invoice_data(user_data: Dict) -> str:
     matched_data = user_data.get("matched_data", {})
     
     # Формируем заголовок
-    supplier = matched_data.get("supplier", "Неизвестный поставщик")
+    supplier = matched_data.get("supplier", "Unknown supplier")
     total = matched_data.get("total", 0)
     
-    message = "📄 *Накладная от {}*\n\n".format(supplier)
+    message = "📄 *Invoice from {}*\n\n".format(supplier)
     
     # Добавляем информацию о товарах
-    message += "*Товары:*\n"
+    message += "*Items:*\n"
     
     for i, line in enumerate(matched_data.get("lines", [])):
         line_num = line.get("line", i + 1)
-        name = line.get("name", "Неизвестный товар")
+        name = line.get("name", "Unknown item")
         qty = line.get("qty", 0)
         unit = line.get("unit", "")
         price = line.get("price", 0)
@@ -118,7 +218,7 @@ def format_invoice_data(user_data: Dict) -> str:
         
         # Форматируем строку с товаром
         item_price = qty * price
-        item_line = "{}. {} - {} {} × {} = {:.2f}".format(
+        item_line = "{}. {} - {} {} × {} = {:.0f}".format(
             line_num, name, qty, unit, price, item_price
         )
         
@@ -134,7 +234,7 @@ def format_invoice_data(user_data: Dict) -> str:
     # Добавляем информацию о конвертациях
     conversions = user_data.get("conversions_applied", [])
     if conversions:
-        message += "\n*Применённые конвертации:*\n"
+        message += "\n*Applied conversions:*\n"
         for conv in conversions:
             message += "• {}: {} {} → {} {}\n".format(
                 conv['product_name'],
@@ -145,7 +245,8 @@ def format_invoice_data(user_data: Dict) -> str:
             )
     
     # Добавляем общую сумму
-    message += "\n*Итого:* {:.2f}".format(total)
+    formatted_total = "{:,.0f}".format(total).replace(",", " ")
+    message += "\n*Total:* IDR {}".format(formatted_total)
     
     return message
 
@@ -163,21 +264,21 @@ def format_final_invoice(user_data: Dict) -> str:
     matched_data = user_data.get("matched_data", {})
     
     # Формируем заголовок
-    supplier = matched_data.get("supplier", "Неизвестный поставщик")
+    supplier = matched_data.get("supplier", "Unknown supplier")
     total = matched_data.get("total", 0)
     
-    message = "📋 *ФИНАЛЬНАЯ НАКЛАДНАЯ*\n\n"
-    message += "*Поставщик:* {}\n\n".format(supplier)
+    message = "📋 *FINAL INVOICE*\n\n"
+    message += "*Supplier:* {}\n\n".format(supplier)
     
     # Добавляем таблицу товаров
-    message += "*ТОВАРЫ:*\n"
+    message += "*ITEMS:*\n"
     message += "```\n"
-    message += "# Наименование                   Кол-во     Цена      Сумма     \n"
+    message += "# Name                         Quantity   Price     Total     \n"
     message += "-" * 70 + "\n"
     
     for i, line in enumerate(matched_data.get("lines", [])):
         line_num = line.get("line", i + 1)
-        name = line.get("name", "Неизвестный товар")
+        name = line.get("name", "Unknown item")
         qty = line.get("qty", 0)
         unit = line.get("unit", "")
         price = line.get("price", 0)
@@ -187,20 +288,24 @@ def format_final_invoice(user_data: Dict) -> str:
         
         # Форматируем строку таблицы
         item_price = qty * price
-        line_str = "{:<3} {:<30} {} {:<6} {:<10.2f} {:<10.2f}\n".format(
-            line_num, display_name, qty, unit, price, item_price
+        formatted_price = "{:,.0f}".format(price).replace(",", " ")
+        formatted_item_price = "{:,.0f}".format(item_price).replace(",", " ")
+        
+        line_str = "{:<3} {:<30} {} {:<6} {:<10} {:<10}\n".format(
+            line_num, display_name, qty, unit, formatted_price, formatted_item_price
         )
         message += line_str
     
     message += "-" * 70 + "\n"
-    message += "ИТОГО:                                            {:.2f}\n".format(total)
+    formatted_total = "{:,.0f}".format(total).replace(",", " ")
+    message += "TOTAL:                                            IDR {}\n".format(formatted_total)
     message += "```\n\n"
     
     # Добавляем информацию о действиях
-    message += "*Действия:*\n"
-    message += "• Подтвердить и отправить в Syrve\n"
-    message += "• Вернуться к редактированию\n"
-    message += "• Отменить и начать заново\n"
+    message += "*Actions:*\n"
+    message += "• Confirm and send to Syrve\n"
+    message += "• Return to editing\n"
+    message += "• Cancel and start over\n"
     
     return message
 
@@ -266,21 +371,40 @@ async def extract_supplier_buyer(ocr_data: Dict) -> Dict:
     # Извлекаем имя поставщика из OCR данных
     vendor_name = ocr_data.get("vendor_name", "")
     buyer_name = ocr_data.get("buyer_name", "")
+    raw_text = ocr_data.get("raw_text", "")
     
-    # Сопоставляем с базой данных
-    vendor_id, vendor_score = match(vendor_name)
-    buyer_id, buyer_score = match(buyer_name)
+    # Поиск покупателя Eggstra в тексте
+    buyer_found = False
+    if raw_text and "eggstra" in raw_text.lower():
+        buyer_name = "Eggstra"
+        buyer_found = True
+    
+    # Поиск поставщика по базе
+    supplier_match = None
+    if vendor_name:
+        supplier_match = find_supplier(vendor_name)
+    
+    # Результат для поставщика
+    if supplier_match:
+        vendor_id, matched_vendor_name = supplier_match
+        vendor_status = "matched"
+        vendor_confidence = 1.0
+    else:
+        vendor_id = None
+        vendor_status = "unmatched"
+        vendor_confidence = 0.0
     
     # Формируем результат
     result = {
-        "vendor_id": vendor_id if vendor_score >= 0.6 else None,
+        "vendor_id": vendor_id,
         "vendor_name": vendor_name,
-        "buyer_id": buyer_id if buyer_score >= 0.6 else None,
-        "buyer_name": buyer_name,
-        "vendor_confidence": vendor_score,
-        "buyer_confidence": buyer_score,
-        "vendor_status": "matched" if vendor_score >= 0.6 else "unmatched",
-        "buyer_status": "matched" if buyer_score >= 0.6 else "unmatched",
+        "buyer_id": None,  # Для Eggstra не требуется ID
+        "buyer_name": buyer_name if buyer_found else "",
+        "vendor_confidence": vendor_confidence,
+        "buyer_confidence": 1.0 if buyer_found else 0.0,
+        "vendor_status": vendor_status,
+        "buyer_status": "matched" if buyer_found else "unmatched",
+        "buyer_found": buyer_found,
     }
     
     return result
@@ -322,19 +446,37 @@ async def enrich_invoice(parsed_invoice: Dict[str, Any]) -> Dict[str, Any]:
     # Сопоставляем товары с базой данных
     enriched_items = await match_products(items)
     
-    # Подсчитываем количество сопоставленных и несопоставленных товаров
-    matched_count = sum(1 for item in enriched_items if item.get("match_status") == "matched")
-    unmatched_count = len(enriched_items) - matched_count
+    # Подсчитываем количество сопоставленных и невалидных товаров
+    matched_count = 0
+    unmatched_count = 0
+    invalid_count = 0
+    
+    for item in enriched_items:
+        quantity = item.get("quantity", 0)
+        price = item.get("price", 0)
+        
+        # Проверяем на невалидность (количество или цена равны 0)
+        if quantity == 0 or price == 0:
+            item["is_valid"] = False
+            invalid_count += 1
+            unmatched_count += 1
+        else:
+            item["is_valid"] = True
+            if item.get("match_status") == "matched":
+                matched_count += 1
+            else:
+                unmatched_count += 1
     
     # Рассчитываем общее количество и сумму сопоставленных товаров
     total_qty_matched = sum(
         item.get("quantity", 0) for item in enriched_items
-        if item.get("match_status") == "matched"
+        if item.get("match_status") == "matched" and item.get("is_valid", True)
     )
     
     total_sum_matched_idr = sum(
         item.get("quantity", 0) * item.get("price", 0)
-        for item in enriched_items if item.get("match_status") == "matched"
+        for item in enriched_items 
+        if item.get("match_status") == "matched" and item.get("is_valid", True)
     )
     
     # Заменяем список товаров обогащенными
@@ -346,6 +488,7 @@ async def enrich_invoice(parsed_invoice: Dict[str, Any]) -> Dict[str, Any]:
         "items_count": len(enriched_items),
         "matched_count": matched_count,
         "unmatched_count": unmatched_count,
+        "invalid_count": invalid_count,
         "total_qty_matched": total_qty_matched,
         "total_sum_matched_idr": total_sum_matched_idr,
     })
@@ -382,8 +525,8 @@ def format_invoice_for_display(invoice_dict: Dict) -> str:
     # Извлекаем основные данные
     vendor_name = invoice_dict.get("vendor_name", "Unknown supplier")
     vendor_id = invoice_dict.get("vendor_id")
-    buyer_name = invoice_dict.get("buyer_name", "Unknown buyer")
-    buyer_id = invoice_dict.get("buyer_id")
+    buyer_name = invoice_dict.get("buyer_name", "")
+    buyer_found = invoice_dict.get("buyer_found", False)
     date = invoice_dict.get("date", datetime.datetime.now().strftime("%Y-%m-%d"))
     
     matched_count = invoice_dict.get("matched_count", 0)
@@ -404,27 +547,38 @@ def format_invoice_for_display(invoice_dict: Dict) -> str:
         "📄 <b>Invoice</b>",
     ]
     
-    # Добавляем информацию о поставщике и покупателе
-    vendor_status = "✓" if vendor_id else "❌"
-    buyer_status = "✓" if buyer_id else "❌"
-    
-    vendor_display = f"{vendor_name}"
+    # Добавляем информацию о поставщике
     if vendor_id:
-        vendor_display += f" (ID {vendor_id})"
+        supplier_display = f"{vendor_name} (ID = {vendor_id})"
+        supplier_status = ""
+    else:
+        supplier_display = "❌ Unknown supplier"
+        supplier_status = "[🖊️ Select supplier]"
     
-    buyer_display = f"{buyer_name}"
-    if buyer_id:
-        buyer_display += f" (ID {buyer_id})"
+    result.append(f"<b>Supplier</b>: {supplier_display}")
+    if supplier_status:
+        result.append(supplier_status)
     
-    result.append(f"<b>Supplier</b>: {vendor_display} {vendor_status}")
-    result.append(f"<b>Buyer</b>: {buyer_display} {buyer_status}")
+    # Добавляем информацию о покупателе
+    if buyer_found:
+        buyer_display = f"{buyer_name}"
+        buyer_status = ""
+    else:
+        buyer_display = "⚠️ Not found – invoice may belong to another venue"
+        buyer_status = "[🖊️ Set buyer]"
+    
+    result.append(f"<b>Buyer</b>: {buyer_display}")
+    if buyer_status:
+        result.append(buyer_status)
+    
     result.append(f"<b>Scanned</b>: {formatted_date}")
     result.append("")
     
     # Добавляем информацию о сопоставленных товарах
     if matched_count > 0:
         total_items = matched_count + unmatched_count
-        result.append(f"✅ Matched {matched_count} / {total_items} lines — IDR {total_sum_matched_idr:,.0f}")
+        formatted_total = "{:,.0f}".format(total_sum_matched_idr).replace(",", " ")
+        result.append(f"✅ Matched {matched_count} / {total_items} lines — IDR {formatted_total}")
     
     if unmatched_count > 0:
         result.append(f"❌ Need fix {unmatched_count}")
@@ -432,8 +586,14 @@ def format_invoice_for_display(invoice_dict: Dict) -> str:
     result.append("")
     
     # Списки сопоставленных и несопоставленных товаров
-    matched_items = [item for item in items if item.get("match_status") == "matched"]
-    unmatched_items = [item for item in items if item.get("match_status") != "matched"]
+    matched_items = [
+        item for item in items 
+        if item.get("match_status") == "matched" and item.get("is_valid", True)
+    ]
+    unmatched_items = [
+        item for item in items 
+        if item.get("match_status") != "matched" or not item.get("is_valid", True)
+    ]
     
     # Добавляем сопоставленные товары
     if matched_items:
@@ -447,11 +607,11 @@ def format_invoice_for_display(invoice_dict: Dict) -> str:
             total_item = quantity * price
             
             # Форматируем строку товара с точками для выравнивания
-            name_dots = name + " " + "." * (20 - len(name))
+            name_dots = name + " " + "." * max(0, 20 - len(name))
             
-            # Форматируем цену в зависимости от наличия десятичной части
-            price_str = f"{price:,.0f}" if price == int(price) else f"{price:,.2f}"
-            total_str = f"{total_item:,.0f}" if total_item == int(total_item) else f"{total_item:,.2f}"
+            # Форматируем цену
+            price_str = "{:,.0f}".format(price).replace(",", " ")
+            total_str = "{:,.0f}".format(total_item).replace(",", " ")
             
             result.append(f"{i}. {name_dots} {quantity} {unit} × {price_str} = {total_str}")
         
@@ -468,15 +628,22 @@ def format_invoice_for_display(invoice_dict: Dict) -> str:
             price = item.get("price", 0)
             total_item = quantity * price
             
-            # Форматируем строку товара с точками для выравнивания
-            name_dots = name + " " + "." * (20 - len(name))
+            # Определяем статус товара
+            status = ""
+            if not item.get("is_valid", True):
+                status = "⚠️"
             
-            # Форматируем цену в зависимости от наличия десятичной части
-            price_str = f"{price:,.0f}" if price == int(price) else f"{price:,.2f}"
-            total_str = f"{total_item:,.0f}" if total_item == int(total_item) else f"{total_item:,.2f}"
+            # Форматируем строку товара с точками для выравнивания
+            name_dots = name + " " + "." * max(0, 20 - len(name))
+            
+            # Форматируем цену
+            price_str = "{:,.0f}".format(price).replace(",", " ")
+            total_str = "{:,.0f}".format(total_item).replace(",", " ")
             
             item_index = items.index(item)
-            result.append(f"{i}. {name_dots} {quantity} {unit} × {price_str} = {total_str}  [✏️ Fix_{item_index+1}]")
+            fix_button = f"[✏️ Fix_{item_index+1}]"
+            
+            result.append(f"{i}. {name_dots} {quantity} {unit} × {price_str} = {total_str} {status} {fix_button}")
     
     return "\n".join(result)
 
