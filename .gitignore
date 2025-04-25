@@ -28,3 +28,7 @@ __pycache__/
 # игнорируем байткод
 *.pyc
 __pycache__/
+
+# ignore byte-code
+*.pyc
+__pycache__/
