@@ -41,7 +41,7 @@ del _m, _n, _v
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=None, case_sensitive=True)
     
-    TELEGRAM_TOKEN: str = Field(..., description="Telegram Bot API Token")
+    TELEGRAM_TOKEN: str = Field(..., env=["TELEGRAM_TOKEN", "TELEGRAM_BOT_TOKEN"])
     OPENAI_API_KEY: str = Field(..., description="OpenAI API Key")
     OPENAI_MODEL: str = Field("gpt-4o", description="OpenAI Model to use")
     
