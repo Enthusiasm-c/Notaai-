@@ -1,102 +1,83 @@
+"""utils.configuration
+
+Centralised runtime settings for the Nota AI application.
+
+* Loads values from **real** environment variables and, _if present_, a local
+  ``.env`` file in the project root.
+* Validates all critical secrets at import time and raises a **clear**
+  ``ValueError`` if something is missing.
+* Uses **pydantic-settings** (Pydantic v2) for type-safe access.
 """
-utils/configuration.py
-
-Centralised application configuration for Nota AI.
-All parameters can be overridden via **environment variables** that begin
-with the prefix `NOTAAI_`.  Example:
-
-    export NOTAAI_PREVIEW_MAX_LINES=10
-
-──────────────────────────────────────────────────────────────────────────────
-Notes
-─────
-* We deliberately **disable reading of `.env` files inside the Docker image**;
-  only real environment variables are considered.  This prevents the classic
-  “[Errno 13] Permission denied: '.env'” problem.
-* Uses **pydantic-settings ≥ 2.0** (built on top of `pydantic v2`).
-"""
-
 from __future__ import annotations
 
+import os
 from pathlib import Path
-from typing import Literal
+from typing import Any, List
 
-from pydantic import Field, field_validator
+from pydantic import UUID4, HttpUrl, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+__all__ = ["settings"]
 
 
 class Config(BaseSettings):
+    """Typed settings model.
+
+    Required environment variables (names are **case-sensitive**):
+    * ``OPENAI_API_KEY``
+    * ``TELEGRAM_TOKEN`` **or** ``TELEGRAM_BOT_TOKEN``
+    * ``SYRVE_SERVER_URL``
+    * ``SYRVE_LOGIN``
+    * ``SYRVE_PASSWORD``
+    * ``DEFAULT_STORE_ID``
     """
-    Runtime configuration for Nota AI bot and worker services.
-    """
-    class Config(BaseSettings):
-    """Runtime configuration for Nota AI."""
-    # ↓↓↓ эта строка отключает поиск .env!
-    model_config = SettingsConfigDict(env_file=(), case_sensitive=True)
 
-    # ── General ────────────────────────────────────────────────────────────
-    LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = (
-        "INFO"
-    )
-    PREVIEW_MAX_LINES: int = Field(
-        20, description="How many invoice lines to show in preview"
-    )
+    # ─── mandatory ──────────────────────────────────────────────────────────
+    openai_api_key: str
+    telegram_token: str | None = None  # filled via validator below
+    syrve_server_url: HttpUrl
+    syrve_login: str
+    syrve_password: str
+    default_store_id: UUID4
 
-    # ── Telegram bot ───────────────────────────────────────────────────────
-    TELEGRAM_BOT_TOKEN: str = Field(..., min_length=30)
-    # Back-compat: allow legacy env var
-    TELEGRAM_TOKEN: str | None = None
+    # ─── optional with sane defaults ───────────────────────────────────────
+    preview_max_lines: int = 20
+    invoice_date_format: str = "%d.%m.%Y"
 
-    # ── OpenAI / LLM ───────────────────────────────────────────────────────
-    OPENAI_API_KEY: str = Field(..., min_length=30)
-    OPENAI_MODEL: str = "gpt-4o"
-
-    # ── Syrve integration ─────────────────────────────────────────────────
-    SYRVE_SERVER_URL: str
-    SYRVE_LOGIN: str
-    SYRVE_PASSWORD: str
-
-    # ── Data files (mounted in image) ──────────────────────────────────────
-    PRODUCTS_CSV: Path = Path("data/base_products.csv")
-    SUPPLIERS_CSV: Path = Path("data/base_suppliers.csv")
-    LEARNED_PRODUCTS_CSV: Path = Path("data/learned_products.csv")
-
-    # ── Pydantic settings ─────────────────────────────────────────────────
+    # ─── pydantic config ───────────────────────────────────────────────────
     model_config = SettingsConfigDict(
-        env_prefix="NOTAAI_",        # all vars may be overridden with this prefix
-        env_file=(),                 # disable .env lookup inside container
-        case_sensitive=True,
-        validate_default=True,
-        extra="ignore",
+        env_prefix="",  # keep original names
+        env_file=".env" if Path(".env").is_file() else None,
+        env_file_encoding="utf-8",
+        validate_assignment=True,
     )
 
-    # ────────────────────── Validators ────────────────────────────────────
-    @field_validator("TELEGRAM_BOT_TOKEN", mode="after")
-    def allow_legacy_token(
-        cls, v: str, values: dict[str, object]  # noqa: D401, N805
-    ) -> str:
-        """
-        Accept legacy `TELEGRAM_TOKEN` if `TELEGRAM_BOT_TOKEN` is empty.
-        """
+    # ─── custom logic ──────────────────────────────────────────────────────
+    @field_validator("telegram_token", mode="before")
+    @classmethod
+    def _resolve_telegram_token(cls, v: str | None) -> str | None:  # noqa: D401 – simple helper
+        """Pick token from *either* TELEGRAM_TOKEN or TELEGRAM_BOT_TOKEN."""
         if v:
             return v
-        legacy = values.get("TELEGRAM_TOKEN")
-        if isinstance(legacy, str) and legacy.strip():
-            return legacy
-        raise ValueError("TELEGRAM_BOT_TOKEN is required")
-
-    @field_validator("PRODUCTS_CSV", "SUPPLIERS_CSV", "LEARNED_PRODUCTS_CSV")
-    def csv_must_exist(
-        cls, path: Path  # noqa: D401, N805
-    ) -> Path:
-        if not path.exists():
-            raise FileNotFoundError(path)
-        return path
+        return os.getenv("TELEGRAM_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
 
 
-# singletons ---------------------------------------------------------------
-settings = Config()
+def _raise_on_missing(e: ValidationError) -> None:  # noqa: ANN001 – signature fixed by pydantic
+    """Convert pydantic's ValidationError into a flat ValueError message."""
+    missing: List[str] = [err["loc"][0].upper() for err in e.errors() if err["type"] == "missing"]
+    if missing:
+        # Handle telegram dual env-var name for clarity
+        missing = [
+            "TELEGRAM_TOKEN or TELEGRAM_BOT_TOKEN" if k == "TELEGRAM_TOKEN" else k
+            for k in missing
+        ]
+        joined = ", ".join(sorted(set(missing)))
+        raise ValueError(f"Missing required environment variables: {joined}") from None
+    raise e  # different kind of validation error
 
-# convenience aliases
-OPENAI_API_KEY = settings.OPENAI_API_KEY
-TELEGRAM_BOT_TOKEN = settings.TELEGRAM_BOT_TOKEN
+
+try:
+    settings = Config()  # created at import time
+except ValidationError as exc:  # pragma: no cover – fail fast at startup
+    _raise_on_missing(exc)
+
