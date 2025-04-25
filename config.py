@@ -3,10 +3,24 @@
 """
 import logging
 import sys
+
+try:                            # Pydantic 2 way
+    from pydantic_settings import BaseSettings, SettingsConfigDict
+except ModuleNotFoundError:     # Fallback for old images / Pydantic 1
+    from pydantic import BaseSettings  # type: ignore
+    SettingsConfigDict = dict        # dummy alias
+
+from pydantic import Field          # Field доступен в обеих версиях
 from enum import IntEnum, auto
 from pathlib import Path
 
-from pydantic import BaseSettings, Field
+
+try:
+    from pydantic_settings import BaseSettings, SettingsConfigDict
+except ModuleNotFoundError:
+    from pydantic import BaseSettings  # type: ignore
+    SettingsConfigDict = dict
+from pydantic import Field
 
 
 # Настройка логирования
