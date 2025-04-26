@@ -4,17 +4,13 @@ handlers/item_handlers.py
 Обработчики Telegram для работы с товарами в накладных.
 """
 
-import asyncio
-import datetime
-import json
 import logging
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from config import ADD_NEW_ITEM, CONFIRMATION, EDIT_ITEM, SELECT_EDIT_ITEM, SET_CONVERSION, WAIT_PHOTO
+from config import CONFIRMATION, EDIT_ITEM, SELECT_EDIT_ITEM, WAIT_PHOTO
 from utils.invoice_processing import format_invoice_for_display
-from utils.learning import save_learned_mapping, save_unit_conversion
 from utils.error_handling import log_error
 
 logger = logging.getLogger(__name__)
