@@ -10,7 +10,7 @@ from pathlib import Path
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from config import CONFIRMATION, WAIT_PHOTO
+from utils.configuration import CONFIRMATION, WAIT_PHOTO
 from services.ocr_service import extract
 from utils.invoice_processing import enrich_invoice, format_invoice_for_display, ensure_result
 from utils.invoice_keyboard import build_invoice_keyboard
