@@ -5,17 +5,14 @@ handlers/manual_item_handlers.py
 """
 
 import datetime
-import json
 import logging
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from config import ADD_NEW_ITEM, CONFIRMATION, EDIT_ITEM, WAIT_PHOTO
+from config import ADD_NEW_ITEM, CONFIRMATION, WAIT_PHOTO
 from utils.learning import save_learned_mapping
-from utils.match import get_product_by_id, match
 from utils.error_handling import log_error
-from utils.invoice_processing import format_invoice_for_display
 
 logger = logging.getLogger(__name__)
 
