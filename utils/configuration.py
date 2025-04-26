@@ -12,7 +12,7 @@ Centralised runtime settings for the Nota AI application.
 from __future__ import annotations
 
 import os
-from typing import Any, List
+from typing import List
 
 from pydantic import UUID4, HttpUrl, Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
