@@ -17,6 +17,18 @@ from utils.error_handling import log_error
 logger = logging.getLogger(__name__)
 
 
+async def check_product_exists(item_name: str) -> tuple[bool, str | None]:
+    """
+    Проверяет, существует ли товар в базе.
+    Возвращает (True, product_id) если найден, иначе (False, None).
+    """
+    from utils.match import match_product
+
+    product_id, score = match_product(item_name)
+    if product_id and score > 80:
+        return True, product_id
+    return False, None
+
 async def handle_manual_item_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Обработка ручного ввода названия товара пользователем.
