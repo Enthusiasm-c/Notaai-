@@ -70,3 +70,23 @@ try:
     settings = Config()  # created at import time
 except ValidationError as exc:
     _raise_on_missing(exc)
+
+# в самый низ файла
+
+# ───────── dialog-state constants ─────────
+WAIT_PHOTO = 0
+WAIT_CONFIRM = 1
+CONFIRMATION = 2
+ADD_NEW_ITEM = 3
+EDIT_ITEM = 4
+SELECT_EDIT_ITEM = 5
+SET_CONVERSION = 6
+FINAL_CONFIRMATION = 7
+FIX_ITEM = 8
+
+__all__ = [
+    "settings",
+    "WAIT_PHOTO", "WAIT_CONFIRM", "CONFIRMATION",
+    "ADD_NEW_ITEM", "EDIT_ITEM", "SELECT_EDIT_ITEM",
+    "SET_CONVERSION", "FINAL_CONFIRMATION", "FIX_ITEM",
+]
