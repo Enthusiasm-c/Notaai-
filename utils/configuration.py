@@ -9,7 +9,6 @@ Centralised runtime settings for the Nota AI application.
 """
 from __future__ import annotations
 
-import os
 from typing import List
 
 from pydantic import (
@@ -36,11 +35,7 @@ __all__ = [
 
 
 class Config(BaseSettings):
-    """Application‑wide runtime configuration.
-
-    All critical secrets are validated at import‑time so that the program fails
-    fast if the environment is mis‑configured.
-    """
+    """Application‑wide runtime configuration."""
 
     # ─────────────── mandatory secrets ────────────────
     openai_api_key: str = Field(..., validation_alias="OPENAI_API_KEY")
