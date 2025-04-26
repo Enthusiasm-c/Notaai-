@@ -1,4 +1,5 @@
-"""utils.configuration
+"""
+utils.configuration
 
 Centralised runtime settings for the Nota AI application.
 
@@ -8,9 +9,11 @@ Centralised runtime settings for the Nota AI application.
   ``ValueError`` if something is missing.
 * Uses **pydantic-settings** (Pydantic v2) for type-safe access.
 """
+
 from __future__ import annotations
 
 import os
+from typing import List
 
 from pydantic import UUID4, HttpUrl, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -52,14 +55,14 @@ class Config(BaseSettings):
     # ─── custom logic ──────────────────────────────────────────────────────
     @field_validator("telegram_token", mode="before")
     @classmethod
-    def _resolve_telegram_token(cls, v: str | None) -> str | None:  # noqa: D401 – simple helper
+    def _resolve_telegram_token(cls, v: str | None) -> str | None:
         """Pick token from *either* TELEGRAM_TOKEN or TELEGRAM_BOT_TOKEN."""
         if v:
             return v
         return os.getenv("TELEGRAM_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
 
 
-def _raise_on_missing(e: ValidationError) -> None:  # noqa: ANN001 – signature fixed by pydantic
+def _raise_on_missing(e: ValidationError) -> None:
     """Convert pydantic's ValidationError into a flat ValueError message."""
     missing: List[str] = [err["loc"][0].upper() for err in e.errors() if err["type"] == "missing"]
     if missing:
