@@ -7,7 +7,7 @@ handlers/conversion_handlers.py
 import datetime
 import logging
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import Update
 from telegram.ext import ContextTypes
 
 from config import SET_CONVERSION, EDIT_ITEM, WAIT_PHOTO
