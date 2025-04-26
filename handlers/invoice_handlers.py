@@ -7,7 +7,7 @@ handlers/invoice_handlers.py
 import logging
 from pathlib import Path
 
-from telegram import InlineKeyboardMarkup, Update
+from telegram import Update
 from telegram.ext import ContextTypes
 
 from config import CONFIRMATION, WAIT_PHOTO
