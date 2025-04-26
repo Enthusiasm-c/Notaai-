@@ -11,8 +11,6 @@ Centralised runtime settings for the Nota AI application.
 from __future__ import annotations
 
 import os
-from pathlib import Path
-from typing import Any, List
 
 from pydantic import UUID4, HttpUrl, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -79,4 +77,3 @@ try:
     settings = Config()  # created at import time
 except ValidationError as exc:  # pragma: no cover – fail fast at startup
     _raise_on_missing(exc)
-
