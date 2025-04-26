@@ -29,6 +29,7 @@ async def check_product_exists(item_name: str) -> tuple[bool, str | None]:
         return True, product_id
     return False, None
 
+
 async def handle_manual_item_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Обработка ручного ввода названия товара пользователем.
