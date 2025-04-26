@@ -21,8 +21,9 @@ _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 _PRODUCTS_CSV = _DATA_DIR / "base_products.csv"
 _SUPPLIERS_CSV = _DATA_DIR / "base_suppliers.csv"
 
+
 # ────────────────────────── CSV loaders (cached) ───────────────────────
- def _load_csv(path: Path) -> List[Dict[str, str]]:
+def _load_csv(path: Path) -> List[Dict[str, str]]:
     if not path.is_file():
         raise FileNotFoundError(f"CSV not found: {path}")
     with path.open(encoding="utf-8") as fh:
