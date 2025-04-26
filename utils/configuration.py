@@ -1,82 +1,72 @@
 """
-utils.configuration
+utils/configuration.py
 
 Centralised runtime settings for the Nota AI application.
 
-* Loads values from **real** environment variables and, _if present_, a local
-  ``.env`` file in the project root.
-* Validates all critical secrets at import time and raises a **clear**
-  ``ValueError`` if something is missing.
-* Uses **pydantic-settings** (Pydantic v2) for type-safe access.
+* Loads values from environment variables and optionally a local
+  `.env` file in the project root.
+* Validates required secrets at import time, raising a clear ValueError if missing.
+* Uses pydantic-settings (Pydantic v2) for type-safe access.
 """
 
 from __future__ import annotations
 
 import os
-from typing import List
+from typing import Any, List
 
-from pydantic import UUID4, HttpUrl, ValidationError, field_validator
+from pydantic import UUID4, HttpUrl, Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 __all__ = ["settings"]
 
 
 class Config(BaseSettings):
-    """Typed settings model.
+    # Mandatory environment variables
+    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
+    telegram_token: str = Field(..., env="TELEGRAM_BOT_TOKEN")
+    syrve_server_url: HttpUrl = Field(..., env="SYRVE_SERVER_URL")
+    syrve_login: str = Field(..., env="SYRVE_LOGIN")
+    syrve_password: str = Field(..., env="SYRVE_PASSWORD")
+    default_store_id: UUID4 = Field(..., env="DEFAULT_STORE_ID")
 
-    Required environment variables (names are **case-sensitive**):
-    * ``OPENAI_API_KEY``
-    * ``TELEGRAM_TOKEN`` **or** ``TELEGRAM_BOT_TOKEN``
-    * ``SYRVE_SERVER_URL``
-    * ``SYRVE_LOGIN``
-    * ``SYRVE_PASSWORD``
-    * ``DEFAULT_STORE_ID``
-    """
+    # Additional CSV paths (с дефолтными значениями)
+    products_csv: str = Field("data/base_products.csv", env="PRODUCTS_CSV")
+    suppliers_csv: str = Field("data/base_suppliers.csv", env="SUPPLIERS_CSV")
+    learned_products_csv: str = Field("data/learned_products.csv", env="LEARNED_PRODUCTS_CSV")
+    learned_suppliers_csv: str = Field("data/learned_suppliers.csv", env="LEARNED_SUPPLIERS_CSV")
 
-    # ─── mandatory ──────────────────────────────────────────────────────────
-    openai_api_key: str
-    telegram_token: str | None = None  # filled via validator below
-    syrve_server_url: HttpUrl
-    syrve_login: str
-    syrve_password: str
-    default_store_id: UUID4
-
-    # ─── optional with sane defaults ───────────────────────────────────────
+    # Optional settings
     preview_max_lines: int = 20
     invoice_date_format: str = "%d.%m.%Y"
 
-    # ─── pydantic config ──────────────────────────────────────────────
     model_config = SettingsConfigDict(
-        env_prefix="",          # читаем окружение как есть
-        env_file=None,          # НЕ ищем .env в контейнере
+        env_prefix="",
+        env_file=".env",
         validate_assignment=True,
+        extra="forbid",
     )
 
-    # ─── custom logic ──────────────────────────────────────────────────────
     @field_validator("telegram_token", mode="before")
     @classmethod
     def _resolve_telegram_token(cls, v: str | None) -> str | None:
-        """Pick token from *either* TELEGRAM_TOKEN or TELEGRAM_BOT_TOKEN."""
+        """Pick token from TELEGRAM_BOT_TOKEN or fallback variables."""
         if v:
             return v
         return os.getenv("TELEGRAM_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
 
 
 def _raise_on_missing(e: ValidationError) -> None:
-    """Convert pydantic's ValidationError into a flat ValueError message."""
+    """Converts pydantic's ValidationError into a flat ValueError message."""
     missing: List[str] = [err["loc"][0].upper() for err in e.errors() if err["type"] == "missing"]
     if missing:
         # Handle telegram dual env-var name for clarity
-        missing = [
-            "TELEGRAM_TOKEN or TELEGRAM_BOT_TOKEN" if k == "TELEGRAM_TOKEN" else k
-            for k in missing
-        ]
+        missing = ["TELEGRAM_TOKEN or TELEGRAM_BOT_TOKEN" if k == "TELEGRAM_TOKEN" else k for k in missing]
         joined = ", ".join(sorted(set(missing)))
         raise ValueError(f"Missing required environment variables: {joined}") from None
-    raise e  # different kind of validation error
+    raise e
 
 
 try:
     settings = Config()  # created at import time
-except ValidationError as exc:  # pragma: no cover – fail fast at startup
+except ValidationError as exc:
     _raise_on_missing(exc)
